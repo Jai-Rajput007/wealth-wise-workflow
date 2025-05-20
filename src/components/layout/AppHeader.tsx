@@ -9,7 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MobileIcon } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileIcon } from '@/components/ui/mobile-icon';
 import { useUser } from '@/contexts/UserContext';
 import { LogOut, User } from 'lucide-react';
 
