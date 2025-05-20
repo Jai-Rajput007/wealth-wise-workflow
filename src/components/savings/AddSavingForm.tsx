@@ -81,6 +81,7 @@ const AddSavingForm: React.FC = () => {
   });
   
   const watchType = form.watch('type');
+  const watchReturnRate = form.watch('returnRate');
   
   // Set default frequencies based on saving type
   React.useEffect(() => {
@@ -132,6 +133,7 @@ const AddSavingForm: React.FC = () => {
   };
   
   return (
+    // The issue was with the Form component import - the shadcn Form component is a wrapper of FormProvider
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -312,7 +314,8 @@ const AddSavingForm: React.FC = () => {
           )}
         </div>
         
-        {watchType !== 'gullak' && field => field.value > 0 && (
+        {/* Fixed the conditional rendering syntax here */}
+        {watchType !== 'gullak' && watchReturnRate > 0 && (
           <FormField
             control={form.control}
             name="returnFrequency"
