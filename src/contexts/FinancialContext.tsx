@@ -55,7 +55,7 @@ export interface ValidationItem {
   id: string;
   title: string;
   amount: number;
-  type: 'expense_split' | 'saving';
+  type: 'expense_split' | 'saving' | 'future_expense';
   date: string;
   expiresAt: string;
   description?: string;

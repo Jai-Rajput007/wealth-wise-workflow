@@ -2,9 +2,10 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, X } from 'lucide-react';
+import { Check, X, Calendar } from 'lucide-react';
 import { useFinancial } from '@/contexts/FinancialContext';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 const ValidationList: React.FC = () => {
   const { validations, validateItem } = useFinancial();
@@ -44,9 +45,20 @@ const ValidationList: React.FC = () => {
             <li key={item.id} className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h3 className="font-medium">{item.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium">{item.title}</h3>
+                    {item.type === 'future_expense' && (
+                      <span className="inline-flex items-center text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {format(new Date(item.date), 'MMM d')}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    ₹{item.amount.toLocaleString()} • Expires: {new Date(item.expiresAt).toLocaleDateString()}
+                    ₹{item.amount.toLocaleString()} • 
+                    {item.type === 'future_expense' 
+                      ? ` Scheduled for: ${format(new Date(item.date), 'PP')}` 
+                      : ` Expires: ${format(new Date(item.expiresAt), 'PP')}`}
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
