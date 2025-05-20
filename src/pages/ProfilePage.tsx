@@ -41,8 +41,8 @@ const ProfilePage = () => {
       name: profile?.name || '',
       email: profile?.email || '',
       username: profile?.username || '',
-      phoneNumber: profile?.phone_number || '',
-      monthlySalary: profile?.monthly_salary || 0
+      phoneNumber: profile?.phoneNumber || '',
+      monthlySalary: profile?.monthlySalary || 0
     },
   });
 
@@ -52,8 +52,8 @@ const ProfilePage = () => {
         name: profile.name,
         email: profile.email,
         username: profile.username,
-        phoneNumber: profile.phone_number || '',
-        monthlySalary: profile.monthly_salary
+        phoneNumber: profile.phoneNumber || '',
+        monthlySalary: profile.monthlySalary
       });
     }
   }, [profile, form]);
@@ -64,16 +64,7 @@ const ProfilePage = () => {
     setIsLoading(true);
     
     try {
-      // Make sure all required fields are present
-      const updatedProfile = {
-        name: values.name,
-        email: values.email,
-        username: values.username,
-        phone_number: values.phoneNumber || null,
-        monthly_salary: values.monthlySalary
-      };
-      
-      await updateProfile(updatedProfile);
+      await updateProfile(values);
       
       toast({
         title: "Profile updated",
