@@ -9,7 +9,210 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          date: string
+          description: string | null
+          frequency: string | null
+          id: string
+          is_split: boolean | null
+          is_validated: boolean
+          split_status: string | null
+          split_with: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          date: string
+          description?: string | null
+          frequency?: string | null
+          id?: string
+          is_split?: boolean | null
+          is_validated?: boolean
+          split_status?: string | null
+          split_with?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          date?: string
+          description?: string | null
+          frequency?: string | null
+          id?: string
+          is_split?: boolean | null
+          is_validated?: boolean
+          split_status?: string | null
+          split_with?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          email: string
+          id: string
+          monthly_salary: number
+          name: string
+          phone_number: string | null
+          username: string
+        }
+        Insert: {
+          email: string
+          id: string
+          monthly_salary?: number
+          name: string
+          phone_number?: string | null
+          username: string
+        }
+        Update: {
+          email?: string
+          id?: string
+          monthly_salary?: number
+          name?: string
+          phone_number?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
+      savings: {
+        Row: {
+          amount: number
+          created_at: string
+          date: string
+          description: string | null
+          frequency: string
+          id: string
+          is_validated: boolean
+          return_frequency: string | null
+          return_rate: number | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          date: string
+          description?: string | null
+          frequency: string
+          id?: string
+          is_validated?: boolean
+          return_frequency?: string | null
+          return_rate?: number | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          date?: string
+          description?: string | null
+          frequency?: string
+          id?: string
+          is_validated?: boolean
+          return_frequency?: string | null
+          return_rate?: number | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          date: string
+          description: string | null
+          id: string
+          related_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string
+          date: string
+          description?: string | null
+          id?: string
+          related_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          related_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      validations: {
+        Row: {
+          amount: number
+          created_at: string
+          date: string
+          description: string | null
+          expires_at: string
+          id: string
+          initiated_by: string | null
+          related_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          date: string
+          description?: string | null
+          expires_at: string
+          id?: string
+          initiated_by?: string | null
+          related_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          date?: string
+          description?: string | null
+          expires_at?: string
+          id?: string
+          initiated_by?: string | null
+          related_id?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

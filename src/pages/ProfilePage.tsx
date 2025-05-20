@@ -28,6 +28,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Separator } from '@/components/ui/separator';
+import { UserProfile } from '@/contexts/UserContext';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50),
@@ -51,20 +52,22 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 type IncomeFormValues = z.infer<typeof incomeSchema>;
 
 const ProfilePage = () => {
-  const { profile, updateProfile, addExtraIncome } = useUser();
+  const { profile, updateProfile, addExtraIncome, loading } = useUser();
   const { addTransaction } = useFinancial();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(!profile);
   
+  const defaultValues: UserProfile = {
+    name: '',
+    email: '',
+    phoneNumber: '',
+    username: '',
+    monthlySalary: 0,
+  };
+  
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: profile || {
-      name: '',
-      email: '',
-      phoneNumber: '',
-      username: '',
-      monthlySalary: 0,
-    },
+    defaultValues: profile || defaultValues,
   });
   
   const incomeForm = useForm<IncomeFormValues>({
@@ -75,52 +78,80 @@ const ProfilePage = () => {
     },
   });
   
-  const onProfileSubmit = (data: ProfileFormValues) => {
-    updateProfile(data);
-    setIsEditing(false);
-    toast({
-      title: 'Profile updated successfully',
-      description: 'Your profile information has been saved.',
-    });
+  const onProfileSubmit = async (data: ProfileFormValues) => {
+    try {
+      await updateProfile(data);
+      setIsEditing(false);
+      toast({
+        title: 'Profile updated successfully',
+        description: 'Your profile information has been saved.',
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: 'Failed to update profile',
+        description: 'An error occurred while saving your profile.',
+        variant: 'destructive',
+      });
+    }
   };
   
-  const onAddIncome = (data: IncomeFormValues) => {
-    addExtraIncome(data.amount, data.description);
-    
-    // Add transaction
-    addTransaction({
-      title: data.description,
-      amount: data.amount,
-      date: new Date().toISOString(),
-      type: 'income',
-      description: 'Extra income',
-    });
-    
-    toast({
-      title: 'Income added successfully',
-      description: `Added ₹${data.amount.toLocaleString()} to your account.`,
-    });
-    
-    incomeForm.reset({
-      amount: 0,
-      description: '',
-    });
+  const onAddIncome = async (data: IncomeFormValues) => {
+    try {
+      addExtraIncome(data.amount, data.description);
+      
+      // Add transaction
+      await addTransaction({
+        title: data.description,
+        amount: data.amount,
+        date: new Date().toISOString(),
+        type: 'income',
+        description: 'Extra income',
+      });
+      
+      toast({
+        title: 'Income added successfully',
+        description: `Added ₹${data.amount.toLocaleString()} to your account.`,
+      });
+      
+      incomeForm.reset({
+        amount: 0,
+        description: '',
+      });
+    } catch (error) {
+      console.error('Error adding income:', error);
+      toast({
+        title: 'Failed to add income',
+        description: 'An error occurred while adding your income.',
+        variant: 'destructive',
+      });
+    }
   };
+  
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading profile information...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
   
   return (
-    <DashboardLayout requireAuth={false}>
+    <DashboardLayout requireAuth={true}>
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Profile</h1>
         
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList>
+          <TabsList className="bg-white">
             <TabsTrigger value="profile">Profile Information</TabsTrigger>
             <TabsTrigger value="income">Add Extra Income</TabsTrigger>
           </TabsList>
           
           <TabsContent value="profile">
-            <Card>
-              <CardHeader>
+            <Card className="border border-gray-200">
+              <CardHeader className="bg-white">
                 <CardTitle>Profile Information</CardTitle>
                 <CardDescription>
                   {isEditing
@@ -248,7 +279,7 @@ const ProfilePage = () => {
                       <dl className="mt-4">
                         <div>
                           <dt className="text-sm text-muted-foreground">Monthly Salary</dt>
-                          <dd className="mt-1 text-xl font-semibold text-money-positive">
+                          <dd className="mt-1 text-xl font-semibold text-green-600">
                             ₹{profile?.monthlySalary.toLocaleString()}
                           </dd>
                         </div>
@@ -257,7 +288,7 @@ const ProfilePage = () => {
                   </div>
                 )}
               </CardContent>
-              <CardFooter className="flex justify-end gap-2">
+              <CardFooter className="flex justify-end gap-2 bg-white">
                 {isEditing ? (
                   <Button type="submit" form="profile-form">
                     Save Profile
@@ -272,8 +303,8 @@ const ProfilePage = () => {
           </TabsContent>
           
           <TabsContent value="income">
-            <Card>
-              <CardHeader>
+            <Card className="border border-gray-200">
+              <CardHeader className="bg-white">
                 <CardTitle>Add Extra Income</CardTitle>
                 <CardDescription>
                   Record any additional income besides your regular salary
@@ -318,7 +349,7 @@ const ProfilePage = () => {
                   </form>
                 </Form>
               </CardContent>
-              <CardFooter className="flex justify-end">
+              <CardFooter className="flex justify-end bg-white">
                 <Button type="submit" form="income-form">
                   Add Income
                 </Button>

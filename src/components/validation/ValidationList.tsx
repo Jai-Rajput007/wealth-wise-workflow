@@ -11,19 +11,28 @@ const ValidationList: React.FC = () => {
   const { validations, validateItem } = useFinancial();
   const { toast } = useToast();
   
-  const handleValidate = (id: string, approved: boolean) => {
-    validateItem(id, approved);
-    
-    toast({
-      title: approved ? "Validated successfully" : "Item rejected",
-      description: "Your financial information has been updated.",
-    });
+  const handleValidate = async (id: string, approved: boolean) => {
+    try {
+      await validateItem(id, approved);
+      
+      toast({
+        title: approved ? "Validated successfully" : "Item rejected",
+        description: "Your financial information has been updated.",
+      });
+    } catch (error) {
+      console.error("Error validating item:", error);
+      toast({
+        title: "Validation failed",
+        description: "An error occurred while processing your validation.",
+        variant: "destructive",
+      });
+    }
   };
   
   // Show a placeholder when there's nothing to validate
   if (validations.length === 0) {
     return (
-      <Card className="h-full">
+      <Card className="h-full border border-gray-200">
         <CardHeader>
           <CardTitle>Pending Validations</CardTitle>
         </CardHeader>
@@ -35,8 +44,8 @@ const ValidationList: React.FC = () => {
   }
   
   return (
-    <Card className="h-full">
-      <CardHeader>
+    <Card className="h-full border border-gray-200">
+      <CardHeader className="bg-white">
         <CardTitle>Pending Validations</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
@@ -48,7 +57,7 @@ const ValidationList: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <h3 className="font-medium">{item.title}</h3>
                     {item.type === 'future_expense' && (
-                      <span className="inline-flex items-center text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full">
+                      <span className="inline-flex items-center text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
                         <Calendar className="w-3 h-3 mr-1" />
                         {format(new Date(item.date), 'MMM d')}
                       </span>

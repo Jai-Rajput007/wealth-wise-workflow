@@ -12,6 +12,7 @@ import ExpensePage from "./pages/ExpensePage";
 import SavingsPage from "./pages/SavingsPage";
 import HistoryPage from "./pages/HistoryPage";
 import ProfilePage from "./pages/ProfilePage";
+import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              <Route path="/auth" element={<AuthPage />} />
               <Route path="/" element={<Index />} />
               <Route path="/expenses" element={<ExpensePage />} />
               <Route path="/savings" element={<SavingsPage />} />

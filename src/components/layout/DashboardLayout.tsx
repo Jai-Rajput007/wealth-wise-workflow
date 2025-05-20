@@ -1,8 +1,10 @@
 
 import React, { ReactNode } from 'react';
-import AppHeader from './AppHeader';
-import { useUser } from '@/contexts/UserContext';
 import { Navigate } from 'react-router-dom';
+import AppHeader from './AppHeader';
+import { Toaster } from "@/components/ui/toaster";
+import { useUser } from '@/contexts/UserContext';
+import { Loader2 } from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -13,22 +15,31 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   children, 
   requireAuth = true 
 }) => {
-  const { profile, isProfileComplete } = useUser();
-  
-  // If authentication is required but profile is not complete, redirect to profile page
-  if (requireAuth && !isProfileComplete) {
-    return <Navigate to="/profile" replace />;
+  const { user, loading } = useUser();
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <AppHeader />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+        <Toaster />
+      </div>
+    );
   }
-  
+
+  if (requireAuth && !user) {
+    return <Navigate to="/auth" replace />;
+  }
+
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-gray-50">
       <AppHeader />
-      <main className="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
+      <main className="flex-1 container mx-auto py-6 px-4 md:px-6">
         {children}
       </main>
-      <footer className="py-4 text-center text-sm text-muted-foreground border-t">
-        <p>© 2025 WealthWise. All rights reserved.</p>
-      </footer>
+      <Toaster />
     </div>
   );
 };
