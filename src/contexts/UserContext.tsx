@@ -86,11 +86,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     if (data) {
       const userProfile: UserProfile = {
-        name: data.name,
-        email: data.email,
+        name: data.name || '',
+        email: data.email || '',
         phoneNumber: data.phone_number || '',
-        username: data.username,
-        monthlySalary: data.monthly_salary
+        username: data.username || '',
+        monthlySalary: data.monthly_salary || 0
       };
       setProfile(userProfile);
     } else {

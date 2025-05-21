@@ -42,6 +42,7 @@ const signupSchema = z.object({
     .max(20, 'Username must be at most 20 characters')
     .regex(/^[a-z0-9_]+$/, 'Username can only contain lowercase letters, numbers, and underscores'),
   email: z.string().email('Please enter a valid email'),
+  phoneNumber: z.string().min(10, 'Please enter a valid phone number'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -68,6 +69,7 @@ const AuthPage: React.FC = () => {
       name: '',
       username: '',
       email: '',
+      phoneNumber: '',
       password: '',
     },
   });
@@ -134,6 +136,7 @@ const AuthPage: React.FC = () => {
           data: {
             name: data.name,
             username: data.username,
+            phone_number: data.phoneNumber
           },
         },
       });
@@ -289,6 +292,20 @@ const AuthPage: React.FC = () => {
                           <FormLabel>Email</FormLabel>
                           <FormControl>
                             <Input placeholder="your.email@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={signupForm.control}
+                      name="phoneNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="1234567890" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
