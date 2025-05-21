@@ -44,7 +44,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      <AppHeader />
+      <AppHeader userName={profile?.username} />
       <div className="flex flex-1">
         {showNav && user && isProfileComplete && <AppSidebar />}
         <main className="flex-1 container mx-auto py-6 px-4 md:px-6">

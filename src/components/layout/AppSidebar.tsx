@@ -46,7 +46,7 @@ const AppSidebar = () => {
 
   return (
     <div className="h-full border-r border-gray-200 w-[250px] bg-white">
-      <div className="py-4">
+      <div className="py-6">
         <SidebarProvider>
           <Sidebar collapsible="none">
             <SidebarContent>
@@ -60,8 +60,10 @@ const AppSidebar = () => {
                           isActive={isActive(item.path)}
                         >
                           <Link to={item.path} className={cn(
-                            "flex items-center gap-3 px-3 py-2 text-sm font-medium",
-                            isActive(item.path) ? "text-primary" : "text-gray-600 hover:text-primary"
+                            "flex items-center gap-4 px-5 py-3 text-base font-medium rounded-lg mb-2",
+                            isActive(item.path) 
+                              ? "bg-primary/10 text-primary" 
+                              : "text-gray-600 hover:bg-gray-100 hover:text-primary"
                           )}>
                             <item.icon className="h-5 w-5" />
                             <span>{item.title}</span>

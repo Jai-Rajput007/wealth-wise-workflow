@@ -4,16 +4,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUser } from './UserContext';
 import { useToast } from '@/hooks/use-toast';
 
-interface Expense {
+export interface Expense {
   id: string;
   userId: string;
   title: string;
   amount: number;
   date: string;
-  category: string;
-  type: string;
+  category: ExpenseCategory;
+  type: ExpenseType;
   description?: string;
-  frequency?: string;
+  frequency?: Frequency;
   isSplit: boolean;
   splitWith?: string;
   splitStatus?: string;
@@ -21,7 +21,7 @@ interface Expense {
   createdAt: string;
 }
 
-interface Saving {
+export interface Saving {
   id: string;
   userId: string;
   title: string;
@@ -29,17 +29,17 @@ interface Saving {
   date: string;
   type: SavingsType;
   description?: string;
-  frequency: string;
+  frequency: Frequency;
   returnRate?: number;
-  returnFrequency?: string;
+  returnFrequency?: Frequency;
   isValidated: boolean;
   createdAt: string;
 }
 
-interface Transaction {
+export interface Transaction {
   id: string;
   userId: string;
-  type: string;
+  type: 'expense' | 'income' | 'saving' | 'return';
   title: string;
   amount: number;
   date: string;
@@ -49,7 +49,7 @@ interface Transaction {
   createdAt: string;
 }
 
-interface Validation {
+export interface Validation {
   id: string;
   userId: string;
   type: string;
@@ -64,6 +64,10 @@ interface Validation {
 }
 
 export type SavingsType = 'sip' | 'mutual_fund' | 'gullak' | 'fixed_deposit' | 'other';
+export type ExpenseType = 'permanent' | 'temporary';
+export type ExpenseCategory = 'rent' | 'food' | 'subscription' | 'recharge' | 'travel' | 
+                             'bill' | 'emi' | 'entertainment' | 'shopping' | 'other';
+export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'once';
 
 interface FinancialContextType {
   expenses: Expense[];
@@ -77,6 +81,7 @@ interface FinancialContextType {
   validateItem: (id: string, approved: boolean) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   deleteSaving: (id: string) => Promise<void>;
+  addIncome: (amount: number, title: string, description?: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -99,7 +104,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
   const remainingMoney = React.useMemo(() => {
     const monthlySalary = profile?.monthlySalary || 0;
     const extraIncome = transactions
-      .filter(t => t.type === 'income' && t.category === 'extra_income')
+      .filter(t => t.type === 'income' || t.type === 'return')
       .reduce((sum, t) => sum + t.amount, 0);
     
     const totalExpenses = expenses
@@ -173,10 +178,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
         title: item.title,
         amount: item.amount,
         date: item.date,
-        category: item.category,
-        type: item.type,
+        category: item.category as ExpenseCategory,
+        type: item.type as ExpenseType,
         description: item.description,
-        frequency: item.frequency,
+        frequency: item.frequency as Frequency,
         isSplit: item.is_split || false,
         splitWith: item.split_with,
         splitStatus: item.split_status,
@@ -209,9 +214,9 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
         date: item.date,
         type: item.type as SavingsType,
         description: item.description,
-        frequency: item.frequency,
+        frequency: item.frequency as Frequency,
         returnRate: item.return_rate,
-        returnFrequency: item.return_frequency,
+        returnFrequency: item.return_frequency as Frequency,
         isValidated: item.is_validated,
         createdAt: item.created_at
       }));
@@ -236,7 +241,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       const formattedTransactions: Transaction[] = data.map(item => ({
         id: item.id,
         userId: item.user_id,
-        type: item.type,
+        type: item.type as 'expense' | 'income' | 'saving' | 'return',
         title: item.title,
         amount: item.amount,
         date: item.date,
@@ -349,16 +354,17 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('username', expense.splitWith)
-        .single();
+        .eq('username', expense.splitWith.trim())
+        .maybeSingle();
       
       if (userError) {
+        console.error("Error finding user:", userError);
         toast({
-          title: "User not found",
+          title: "Error finding user",
           description: `Could not find user "${expense.splitWith}"`,
           variant: "destructive"
         });
-        throw userError;
+        return;
       }
       
       if (!userData) {
@@ -538,7 +544,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
         .from('transactions')
         .insert({
           user_id: user!.id,
-          type: 'income',
+          type: 'return',
           title: `Return on ${saving.title}`,
           amount: returnAmount,
           date: returnDate.toISOString(),
@@ -549,6 +555,40 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       
     } catch (error) {
       console.error("Error processing savings returns:", error);
+    }
+  };
+
+  // Add extra income
+  const addIncome = async (amount: number, title: string, description?: string) => {
+    if (!user) return;
+    
+    try {
+      // Record transaction for the income
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'income',
+          title: title,
+          amount: amount,
+          date: new Date().toISOString(),
+          category: 'extra_income',
+          description: description || 'Extra income'
+        });
+      
+      await fetchData();
+      
+      toast({
+        title: "Income added",
+        description: `Added ${amount} to your balance.`
+      });
+    } catch (error) {
+      console.error("Error adding income:", error);
+      toast({
+        title: "Error adding income",
+        description: "Failed to add your income.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -625,7 +665,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
         if (expenseError) throw expenseError;
         
         // Create a new expense for the current user
-        await supabase
+        const { data: newExpense, error: newExpenseError } = await supabase
           .from('expenses')
           .insert({
             user_id: user.id,
@@ -639,7 +679,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
             split_with: validation.initiated_by,
             split_status: 'accepted',
             is_validated: true
-          });
+          })
+          .select();
+        
+        if (newExpenseError) throw newExpenseError;
         
         // Update the original expense status
         await supabase
@@ -660,7 +703,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
             date: validation.date,
             category: originalExpense?.category || 'other',
             description: `Split expense with ${validation.initiated_by || 'someone'}`,
-            related_id: validation.related_id
+            related_id: newExpense?.[0]?.id
           });
       } else {
         // Rejected split - update the original expense status
@@ -759,6 +802,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     validateItem,
     deleteExpense,
     deleteSaving,
+    addIncome,
     loading
   };
 
