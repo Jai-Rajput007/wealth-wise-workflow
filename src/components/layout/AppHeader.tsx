@@ -1,147 +1,160 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useIsMobile } from '@/hooks/use-mobile';
-import { MobileIcon } from '@/components/ui/mobile-icon';
 import { useUser } from '@/contexts/UserContext';
-import { LogOut, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { 
+  LayoutDashboard, 
+  DollarSign, 
+  PiggyBank, 
+  History, 
+  User, 
+  LogOut, 
+  CheckCircle 
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
-const navigationItems = [
-  { name: "Dashboard", href: "/" },
-  { name: "Expenses", href: "/expenses" },
-  { name: "Savings", href: "/savings" },
-  { name: "History", href: "/history" }
-];
-
-const AppHeader = () => {
+const AppHeader: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useUser();
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
-  
-  const toggleMobileMenu = () => {
-    setShowMobileMenu(prev => !prev);
-  };
+  const { toast } = useToast();
   
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: "Logout failed",
+        description: "An error occurred while logging out.",
+        variant: "destructive",
+      });
+    }
   };
-
-  return (
-    <header className="sticky top-0 z-40 border-b border-b-slate-200 bg-white">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center">
+  
+  const isActive = (path: string) => {
+    return location.pathname === path;
+  };
+  
+  // Don't show navigation on auth page
+  if (location.pathname === '/auth' || location.pathname === '/salary-setup') {
+    return (
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center">
-            <span className="text-xl font-semibold text-primary">ExpenseTracker</span>
+            <DollarSign className="h-6 w-6 text-primary mr-2" />
+            <span className="font-bold text-lg">ExpenseChecker</span>
           </Link>
         </div>
-
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-2">
-          {navigationItems.map((item) => (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={cn(
-                "px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                location.pathname === item.href
-                  ? "bg-slate-100 text-slate-900"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              )}
+      </header>
+    );
+  }
+  
+  return (
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        <Link to="/" className="flex items-center">
+          <DollarSign className="h-6 w-6 text-primary mr-2" />
+          <span className="font-bold text-lg">ExpenseChecker</span>
+        </Link>
+        
+        {user ? (
+          <nav className="hidden md:flex gap-1">
+            <Button
+              variant={isActive('/') ? "default" : "ghost"}
+              size="sm"
+              asChild
             >
-              {item.name}
-            </Link>
-          ))}
-          
-          {user && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <User className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link to="/profile" className="cursor-pointer">
-                    Profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </nav>
-
-        {/* Mobile Menu Button */}
-        <div className="flex items-center md:hidden">
-          <Button
-            variant="ghost"
-            className="h-9 w-9 p-0"
-            onClick={toggleMobileMenu}
-            aria-label="Toggle menu"
-          >
-            <MobileIcon showMobileMenu={showMobileMenu} />
+              <Link to="/">
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Dashboard
+              </Link>
+            </Button>
+            
+            <Button
+              variant={isActive('/expenses') ? "default" : "ghost"}
+              size="sm"
+              asChild
+            >
+              <Link to="/expenses">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Expenses
+              </Link>
+            </Button>
+            
+            <Button
+              variant={isActive('/savings') ? "default" : "ghost"}
+              size="sm"
+              asChild
+            >
+              <Link to="/savings">
+                <PiggyBank className="h-4 w-4 mr-2" />
+                Savings
+              </Link>
+            </Button>
+            
+            <Button
+              variant={isActive('/history') ? "default" : "ghost"}
+              size="sm"
+              asChild
+            >
+              <Link to="/history">
+                <History className="h-4 w-4 mr-2" />
+                History
+              </Link>
+            </Button>
+            
+            <Button
+              variant={isActive('/validations') ? "default" : "ghost"}
+              size="sm"
+              asChild
+            >
+              <Link to="/validations">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Validations
+              </Link>
+            </Button>
+            
+            <Button
+              variant={isActive('/profile') ? "default" : "ghost"}
+              size="sm"
+              asChild
+            >
+              <Link to="/profile">
+                <User className="h-4 w-4 mr-2" />
+                Profile
+              </Link>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </nav>
+        ) : (
+          <Button asChild size="sm">
+            <Link to="/auth">Login</Link>
           </Button>
-        </div>
+        )}
+        
+        {/* Mobile menu button (implement mobile menu logic here) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="md:hidden"
+        >
+          <span className="sr-only">Open menu</span>
+          {/* Icon for mobile menu */}
+        </Button>
       </div>
-
-      {/* Mobile Navigation */}
-      {showMobileMenu && (
-        <div className="md:hidden border-t border-slate-200">
-          <div className="container mx-auto px-4 py-2">
-            <nav className="flex flex-col space-y-1">
-              {navigationItems.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
-                    "px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                    location.pathname === item.href
-                      ? "bg-slate-100 text-slate-900"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                  )}
-                  onClick={() => setShowMobileMenu(false)}
-                >
-                  {item.name}
-                </Link>
-              ))}
-              
-              {user && (
-                <>
-                  <Link
-                    to="/profile"
-                    className="px-3 py-2 text-sm font-medium rounded-md transition-colors text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                    onClick={() => setShowMobileMenu(false)}
-                  >
-                    Profile
-                  </Link>
-                  <Button 
-                    variant="ghost"
-                    className="px-3 py-2 text-sm font-medium rounded-md transition-colors text-red-600 hover:bg-red-50 justify-start"
-                    onClick={() => {
-                      handleLogout();
-                      setShowMobileMenu(false);
-                    }}
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </>
-              )}
-            </nav>
-          </div>
-        </div>
-      )}
     </header>
   );
 };

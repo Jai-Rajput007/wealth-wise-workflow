@@ -9,13 +9,15 @@ import { Loader2 } from 'lucide-react';
 interface DashboardLayoutProps {
   children: ReactNode;
   requireAuth?: boolean;
+  showNav?: boolean;
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ 
   children, 
-  requireAuth = true 
+  requireAuth = true,
+  showNav = true
 }) => {
-  const { user, loading } = useUser();
+  const { user, loading, profile, isProfileComplete } = useUser();
 
   if (loading) {
     return (
@@ -31,6 +33,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   if (requireAuth && !user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // If the user is authenticated but doesn't have a salary set up, redirect to salary setup
+  // Only redirect if not already on the salary setup page and not on the auth page
+  if (user && profile && !profile.monthlySalary && window.location.pathname !== '/salary-setup' && window.location.pathname !== '/auth') {
+    return <Navigate to="/salary-setup" replace />;
   }
 
   return (

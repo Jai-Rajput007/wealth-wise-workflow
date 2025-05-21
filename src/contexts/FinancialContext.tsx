@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useUser } from './UserContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -275,6 +274,13 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     const currentDate = new Date();
     const isFutureExpense = expenseDate > currentDate;
     
+    // Calculate the effective amount based on split
+    let effectiveAmount = newExpense.amount;
+    if (newExpense.isSplit && newExpense.splitWith) {
+      // If expense is split, only half of it affects this user
+      effectiveAmount = newExpense.amount / 2;
+    }
+    
     // If it's a future expense, add to validations instead
     if (isFutureExpense && newExpense.type === 'temporary') {
       // Add to expenses but mark as not validated
@@ -283,7 +289,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
         .insert([{
           user_id: user.id,
           title: newExpense.title,
-          amount: newExpense.amount,
+          amount: effectiveAmount, // Use the effective amount
           date: newExpense.date,
           type: newExpense.type,
           category: newExpense.category,
@@ -309,7 +315,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
         .insert([{
           user_id: user.id,
           title: `Future expense: ${newExpense.title}`,
-          amount: newExpense.amount,
+          amount: effectiveAmount, // Use the effective amount
           type: 'future_expense',
           date: newExpense.date,
           expires_at: expenseDate.toISOString(),
@@ -336,7 +342,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
       const validationItem: ValidationItem = {
         id: validationData!.id,
         title: `Future expense: ${newExpense.title}`,
-        amount: newExpense.amount,
+        amount: effectiveAmount, // Use the effective amount
         type: 'future_expense',
         date: newExpense.date,
         expiresAt: expenseDate.toISOString(),
@@ -360,7 +366,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
       .insert([{
         user_id: user.id,
         title: newExpense.title,
-        amount: newExpense.amount,
+        amount: effectiveAmount, // Use the effective amount
         date: newExpense.date,
         type: newExpense.type,
         category: newExpense.category,
@@ -368,7 +374,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
         frequency: newExpense.frequency,
         is_split: newExpense.isSplit || false,
         split_with: newExpense.splitWith,
-        split_status: newExpense.splitStatus,
+        split_status: newExpense.isSplit ? 'pending' : undefined,
         is_validated: newExpense.type === 'temporary' && !isFutureExpense // Only temporary expenses that are not in the future are auto-validated
       }])
       .select('id')
@@ -381,6 +387,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     
     const expense: Expense = {
       ...newExpense,
+      amount: effectiveAmount, // Use the effective amount
       id: data!.id,
       isValidated: newExpense.type === 'temporary' && !isFutureExpense
     };
@@ -391,7 +398,7 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     if (newExpense.type === 'temporary' && !isFutureExpense) {
       await addTransaction({
         title: newExpense.title,
-        amount: newExpense.amount,
+        amount: effectiveAmount, // Use the effective amount
         date: newExpense.date,
         type: 'expense',
         category: newExpense.category,
@@ -400,45 +407,57 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
       });
     }
     
-    // If it's a split expense, add to validations
+    // If it's a split expense, add to validations for the other user
     if (newExpense.isSplit && newExpense.splitWith) {
       const validationExpires = new Date();
       validationExpires.setDate(validationExpires.getDate() + 1); // 24 hours to validate
       
-      const { data: validationData, error: validationError } = await supabase
-        .from('validations')
-        .insert([{
-          user_id: user.id,
-          title: `Split expense: ${newExpense.title}`,
-          amount: newExpense.amount / 2, // Assuming equal split
-          type: 'expense_split',
-          date: newExpense.date,
-          expires_at: validationExpires.toISOString(),
-          description: newExpense.description,
-          related_id: data!.id,
-          initiated_by: user.id // In a real app, this would be the current user's ID
-        }])
+      // Find the user with the provided username
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
         .select('id')
+        .eq('username', newExpense.splitWith)
         .single();
         
-      if (validationError) {
-        console.error('Error creating validation:', validationError);
-        throw validationError;
+      if (userError || !userData) {
+        console.error('Error finding user for split:', userError);
+        toast({
+          title: "User not found",
+          description: `Could not find user with username ${newExpense.splitWith}`,
+          variant: "destructive"
+        });
+      } else {
+        // Add validation for the other user
+        const { data: validationData, error: validationError } = await supabase
+          .from('validations')
+          .insert([{
+            user_id: userData.id, // The other user's ID
+            title: `Split expense: ${newExpense.title}`,
+            amount: effectiveAmount, // This is already half the total
+            type: 'expense_split',
+            date: newExpense.date,
+            expires_at: validationExpires.toISOString(),
+            description: newExpense.description,
+            related_id: data!.id,
+            initiated_by: user.id
+          }])
+          .select('id')
+          .single();
+          
+        if (validationError) {
+          console.error('Error creating validation for other user:', validationError);
+          toast({
+            title: "Split notification failed",
+            description: `Failed to notify ${newExpense.splitWith} about the split expense.`,
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Split expense added",
+            description: `${newExpense.splitWith} has been notified to approve this split expense.`,
+          });
+        }
       }
-      
-      const validationItem: ValidationItem = {
-        id: validationData!.id,
-        title: `Split expense: ${newExpense.title}`,
-        amount: newExpense.amount / 2,
-        type: 'expense_split',
-        date: newExpense.date,
-        expiresAt: validationExpires.toISOString(),
-        description: newExpense.description,
-        relatedId: data!.id,
-        initiatedBy: user.id
-      };
-      
-      setValidations(prev => [...prev, validationItem]);
     }
     
     return data!.id;
@@ -573,58 +592,87 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     
     if (validation.type === 'expense_split') {
       // Handle expense split validation
-      const expense = expenses.find(e => e.id === validation.relatedId);
-      if (expense) {
-        if (isApproved) {
-          // Update the expense's split status
-          const { error } = await supabase
-            .from('expenses')
-            .update({ split_status: 'approved' })
-            .eq('id', expense.id);
-            
-          if (error) {
-            console.error('Error updating expense:', error);
-            throw error;
-          }
+      // Get the original expense details
+      const { data: originalExpense, error: fetchError } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('id', validation.relatedId)
+        .single();
+        
+      if (fetchError || !originalExpense) {
+        console.error('Error fetching original expense:', fetchError);
+        throw fetchError;
+      }
+      
+      if (isApproved) {
+        // Update the expense's split status
+        const { error } = await supabase
+          .from('expenses')
+          .update({ split_status: 'approved' })
+          .eq('id', validation.relatedId);
           
-          setExpenses(prev => 
-            prev.map(e => 
-              e.id === expense.id 
-                ? { ...e, splitStatus: 'approved' } 
-                : e
-            )
-          );
-          
-          // Add a transaction for the split
-          await addTransaction({
-            title: `Split: ${expense.title}`,
+        if (error) {
+          console.error('Error updating expense:', error);
+          throw error;
+        }
+        
+        // Add a new expense for the current user (the one who approved)
+        const { error: createError } = await supabase
+          .from('expenses')
+          .insert([{
+            user_id: user.id,
+            title: `Split: ${originalExpense.title}`,
             amount: validation.amount,
             date: new Date().toISOString(),
-            type: 'expense',
-            category: expense.category,
-            description: `Split payment for ${expense.title}`,
-            relatedId: expense.id
-          });
-        } else {
-          // Mark as rejected
-          const { error } = await supabase
-            .from('expenses')
-            .update({ split_status: 'rejected' })
-            .eq('id', expense.id);
-            
-          if (error) {
-            console.error('Error updating expense:', error);
-            throw error;
-          }
+            type: originalExpense.type,
+            category: originalExpense.category,
+            description: `Split payment for ${originalExpense.title}`,
+            is_validated: true
+          }]);
           
-          setExpenses(prev => 
-            prev.map(e => 
-              e.id === expense.id 
-                ? { ...e, splitStatus: 'rejected' } 
-                : e
-            )
-          );
+        if (createError) {
+          console.error('Error creating expense for split:', createError);
+          throw createError;
         }
+        
+        // Reload expenses
+        fetchExpenses();
+        
+        // Add a transaction for the split
+        await addTransaction({
+          title: `Split: ${originalExpense.title}`,
+          amount: validation.amount,
+          date: new Date().toISOString(),
+          type: 'expense',
+          category: originalExpense.category as ExpenseCategory,
+          description: `Split payment for ${originalExpense.title}`,
+          relatedId: validation.relatedId
+        });
+        
+        toast({
+          title: "Split expense approved",
+          description: `You have approved to pay ${validation.amount.toLocaleString()} for this split expense.`,
+        });
+      } else {
+        // Mark as rejected
+        const { error } = await supabase
+          .from('expenses')
+          .update({ split_status: 'rejected' })
+          .eq('id', validation.relatedId);
+          
+        if (error) {
+          console.error('Error updating expense:', error);
+          throw error;
+        }
+        
+        toast({
+          title: "Split expense rejected",
+          description: `You have rejected this split expense.`,
+        });
+        
+        // Notify the original creator
+        // This would be better implemented with a proper notification system
+        console.log(`User ${user.id} rejected split expense ${validation.relatedId}`);
       }
     } else if (validation.type === 'saving') {
       // Handle saving validation
