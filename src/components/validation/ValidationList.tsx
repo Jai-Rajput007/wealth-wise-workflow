@@ -32,8 +32,8 @@ const ValidationList: React.FC = () => {
   // Show a placeholder when there's nothing to validate
   if (validations.length === 0) {
     return (
-      <Card className="h-full border border-gray-200">
-        <CardHeader>
+      <Card className="h-full border border-gray-200 shadow-sm">
+        <CardHeader className="bg-white border-b border-gray-100">
           <CardTitle>Pending Validations</CardTitle>
         </CardHeader>
         <CardContent>
@@ -44,8 +44,8 @@ const ValidationList: React.FC = () => {
   }
   
   return (
-    <Card className="h-full border border-gray-200">
-      <CardHeader className="bg-white">
+    <Card className="h-full border border-gray-200 shadow-sm">
+      <CardHeader className="bg-white border-b border-gray-100">
         <CardTitle>Pending Validations</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
@@ -83,7 +83,7 @@ const ValidationList: React.FC = () => {
                   <Button 
                     size="sm" 
                     variant="outline"
-                    className="border-green-500 hover:bg-green-500 hover:text-white"
+                    className="border-primary hover:bg-primary hover:text-white"
                     onClick={() => handleValidate(item.id, true)}
                   >
                     <Check className="w-4 h-4 mr-1" />

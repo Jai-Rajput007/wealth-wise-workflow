@@ -64,7 +64,16 @@ const ProfilePage = () => {
     setIsLoading(true);
     
     try {
-      await updateProfile(values);
+      // Create a complete UserProfile object to satisfy TypeScript requirements
+      const completeProfile = {
+        name: values.name,
+        email: values.email,
+        username: values.username,
+        phoneNumber: values.phoneNumber || '',
+        monthlySalary: values.monthlySalary
+      };
+      
+      await updateProfile(completeProfile);
       
       toast({
         title: "Profile updated",
@@ -85,11 +94,11 @@ const ProfilePage = () => {
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader className="bg-white border-b border-gray-100">
             <CardTitle>Profile Settings</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
@@ -99,7 +108,7 @@ const ProfilePage = () => {
                     <FormItem>
                       <FormLabel>Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Doe" {...field} />
+                        <Input placeholder="John Doe" {...field} className="border-gray-200" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -113,7 +122,7 @@ const ProfilePage = () => {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="john@example.com" {...field} />
+                        <Input type="email" placeholder="john@example.com" {...field} className="border-gray-200" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -127,7 +136,7 @@ const ProfilePage = () => {
                     <FormItem>
                       <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input placeholder="johndoe" {...field} />
+                        <Input placeholder="johndoe" {...field} className="border-gray-200" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -141,7 +150,7 @@ const ProfilePage = () => {
                     <FormItem>
                       <FormLabel>Phone Number (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="+1 (555) 123-4567" {...field} />
+                        <Input placeholder="+1 (555) 123-4567" {...field} className="border-gray-200" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -155,14 +164,14 @@ const ProfilePage = () => {
                     <FormItem>
                       <FormLabel>Monthly Salary</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input type="number" {...field} className="border-gray-200" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 text-white">
                   {isLoading ? "Saving..." : "Save Changes"}
                 </Button>
               </form>

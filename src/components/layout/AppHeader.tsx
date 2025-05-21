@@ -39,7 +39,7 @@ const AppHeader = () => {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center">
           <Link to="/" className="flex items-center">
-            <span className="text-xl font-semibold">ExpenseTracker</span>
+            <span className="text-xl font-semibold text-primary">ExpenseTracker</span>
           </Link>
         </div>
 

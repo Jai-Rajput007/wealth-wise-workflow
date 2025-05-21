@@ -116,7 +116,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     if (error) {
       console.error('Error updating profile:', error);
-      return;
+      throw error;
     }
     
     setProfile(newProfile);
