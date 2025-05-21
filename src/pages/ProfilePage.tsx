@@ -18,8 +18,9 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/contexts/UserContext';
 import { supabase } from '@/integrations/supabase/client';
+import { Separator } from '@/components/ui/separator';
 
-// Define the form schema
+// Define the profile form schema
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z.string().email('Please enter a valid email address.'),
@@ -28,14 +29,22 @@ const profileSchema = z.object({
   monthlySalary: z.coerce.number().nonnegative('Monthly salary cannot be negative.')
 });
 
+// Define the extra income form schema
+const extraIncomeSchema = z.object({
+  amount: z.coerce.number().positive('Amount must be positive.'),
+  description: z.string().min(3, 'Description must be at least 3 characters.')
+});
+
 type ProfileFormValues = z.infer<typeof profileSchema>;
+type ExtraIncomeFormValues = z.infer<typeof extraIncomeSchema>;
 
 const ProfilePage = () => {
-  const { user, profile, updateProfile } = useUser();
+  const { user, profile, updateProfile, addExtraIncome } = useUser();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddingIncome, setIsAddingIncome] = useState(false);
 
-  const form = useForm<ProfileFormValues>({
+  const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       name: profile?.name || '',
@@ -46,9 +55,17 @@ const ProfilePage = () => {
     },
   });
 
+  const incomeForm = useForm<ExtraIncomeFormValues>({
+    resolver: zodResolver(extraIncomeSchema),
+    defaultValues: {
+      amount: 0,
+      description: ''
+    }
+  });
+
   useEffect(() => {
     if (profile) {
-      form.reset({
+      profileForm.reset({
         name: profile.name,
         email: profile.email,
         username: profile.username,
@@ -56,15 +73,14 @@ const ProfilePage = () => {
         monthlySalary: profile.monthlySalary
       });
     }
-  }, [profile, form]);
+  }, [profile, profileForm]);
 
-  const onSubmit = async (values: ProfileFormValues) => {
+  const onProfileSubmit = async (values: ProfileFormValues) => {
     if (!user) return;
     
     setIsLoading(true);
     
     try {
-      // Create a complete UserProfile object to satisfy TypeScript requirements
       const completeProfile = {
         name: values.name,
         email: values.email,
@@ -91,74 +107,109 @@ const ProfilePage = () => {
     }
   };
 
+  const onExtraIncomeSubmit = async (values: ExtraIncomeFormValues) => {
+    if (!user) return;
+    
+    setIsAddingIncome(true);
+    
+    try {
+      await addExtraIncome(values.amount, values.description);
+      
+      toast({
+        title: "Extra income added",
+        description: `Added ${values.amount} to your balance.`
+      });
+      
+      incomeForm.reset({
+        amount: 0,
+        description: ''
+      });
+    } catch (error) {
+      console.error("Error adding extra income:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem adding your extra income.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingIncome(false);
+    }
+  };
+
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto">
-        <Card className="border border-gray-200 shadow-sm">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <h1 className="text-3xl font-bold">Profile Settings</h1>
+
+        <Card className="border border-gray-200 shadow-sm bg-white">
           <CardHeader className="bg-white border-b border-gray-100">
-            <CardTitle>Profile Settings</CardTitle>
+            <CardTitle>Your Profile</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} className="border-gray-200" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            <Form {...profileForm}>
+              <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <FormField
+                    control={profileForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John Doe" {...field} className="border-gray-200" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={profileForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="john@example.com" {...field} className="border-gray-200" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                  <FormField
+                    control={profileForm.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Username</FormLabel>
+                        <FormControl>
+                          <Input placeholder="johndoe" {...field} className="border-gray-200" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={profileForm.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+1 (555) 123-4567" {...field} className="border-gray-200" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 
                 <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="john@example.com" {...field} className="border-gray-200" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Username</FormLabel>
-                      <FormControl>
-                        <Input placeholder="johndoe" {...field} className="border-gray-200" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="phoneNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+1 (555) 123-4567" {...field} className="border-gray-200" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
+                  control={profileForm.control}
                   name="monthlySalary"
                   render={({ field }) => (
                     <FormItem>
@@ -173,6 +224,51 @@ const ProfilePage = () => {
                 
                 <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 text-white">
                   {isLoading ? "Saving..." : "Save Changes"}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-gray-200 shadow-sm bg-white">
+          <CardHeader className="bg-white border-b border-gray-100">
+            <CardTitle>Add Extra Income</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <Form {...incomeForm}>
+              <form onSubmit={incomeForm.handleSubmit(onExtraIncomeSubmit)} className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <FormField
+                    control={incomeForm.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="1000" {...field} className="border-gray-200" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={incomeForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Bonus, Gift, etc." {...field} className="border-gray-200" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <Button type="submit" disabled={isAddingIncome} className="bg-green-600 hover:bg-green-700 text-white">
+                  {isAddingIncome ? "Adding..." : "Add Extra Income"}
                 </Button>
               </form>
             </Form>

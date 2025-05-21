@@ -36,6 +36,7 @@ const App = () => (
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/validations" element={<ValidationPage />} />
+              <Route path="/" element={<Navigate to="/auth" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

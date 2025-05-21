@@ -17,7 +17,7 @@ interface UserContextType {
   profile: UserProfile | null;
   isProfileComplete: boolean;
   updateProfile: (profile: UserProfile) => Promise<void>;
-  addExtraIncome: (amount: number, description: string) => void;
+  addExtraIncome: (amount: number, description: string) => Promise<void>;
   resetProfile: () => void;
   logout: () => Promise<void>;
   loading: boolean;
@@ -122,11 +122,26 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setProfile(newProfile);
   };
   
-  const addExtraIncome = (amount: number, description: string) => {
+  const addExtraIncome = async (amount: number, description: string) => {
     if (!user) return;
     
-    // This will be integrated with the FinancialContext
-    console.log(`Added extra income: ${amount} - ${description}`);
+    // Add the extra income as a transaction
+    const { error } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: user.id,
+        type: 'income',
+        category: 'extra_income',
+        amount: amount,
+        title: 'Extra Income',
+        description: description,
+        date: new Date().toISOString()
+      });
+    
+    if (error) {
+      console.error('Error adding extra income:', error);
+      throw error;
+    }
   };
   
   const resetProfile = () => {

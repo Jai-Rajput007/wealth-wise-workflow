@@ -1,23 +1,40 @@
 
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '@/contexts/UserContext';
+import { useFinancial } from '@/contexts/FinancialContext';
 import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, 
-  DollarSign, 
-  PiggyBank, 
-  History, 
-  User, 
-  LogOut, 
-  CheckCircle 
+import {
+  DollarSign,
+  User,
+  LogOut,
+  Bell,
+  ChevronDown,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const AppHeader: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout } = useUser();
+  const { validations } = useFinancial();
   const { toast } = useToast();
+  const [pendingCount, setPendingCount] = useState(0);
+  
+  useEffect(() => {
+    if (validations && validations.length > 0) {
+      setPendingCount(validations.length);
+    } else {
+      setPendingCount(0);
+    }
+  }, [validations]);
   
   const handleLogout = async () => {
     try {
@@ -26,6 +43,7 @@ const AppHeader: React.FC = () => {
         title: "Logged out",
         description: "You have been logged out successfully.",
       });
+      navigate('/auth');
     } catch (error) {
       console.error('Logout error:', error);
       toast({
@@ -34,10 +52,6 @@ const AppHeader: React.FC = () => {
         variant: "destructive",
       });
     }
-  };
-  
-  const isActive = (path: string) => {
-    return location.pathname === path;
   };
   
   // Don't show navigation on auth page
@@ -63,97 +77,47 @@ const AppHeader: React.FC = () => {
         </Link>
         
         {user ? (
-          <nav className="hidden md:flex gap-1">
-            <Button
-              variant={isActive('/') ? "default" : "ghost"}
-              size="sm"
-              asChild
-            >
-              <Link to="/">
-                <LayoutDashboard className="h-4 w-4 mr-2" />
-                Dashboard
-              </Link>
-            </Button>
-            
-            <Button
-              variant={isActive('/expenses') ? "default" : "ghost"}
-              size="sm"
-              asChild
-            >
-              <Link to="/expenses">
-                <DollarSign className="h-4 w-4 mr-2" />
-                Expenses
-              </Link>
-            </Button>
-            
-            <Button
-              variant={isActive('/savings') ? "default" : "ghost"}
-              size="sm"
-              asChild
-            >
-              <Link to="/savings">
-                <PiggyBank className="h-4 w-4 mr-2" />
-                Savings
-              </Link>
-            </Button>
-            
-            <Button
-              variant={isActive('/history') ? "default" : "ghost"}
-              size="sm"
-              asChild
-            >
-              <Link to="/history">
-                <History className="h-4 w-4 mr-2" />
-                History
-              </Link>
-            </Button>
-            
-            <Button
-              variant={isActive('/validations') ? "default" : "ghost"}
-              size="sm"
-              asChild
-            >
-              <Link to="/validations">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Validations
-              </Link>
-            </Button>
-            
-            <Button
-              variant={isActive('/profile') ? "default" : "ghost"}
-              size="sm"
-              asChild
-            >
-              <Link to="/profile">
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </Link>
-            </Button>
-            
+          <div className="flex items-center space-x-4">
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleLogout}
+              className="relative"
+              onClick={() => navigate('/validations')}
             >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              <Bell className="h-5 w-5" />
+              {pendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {pendingCount}
+                </span>
+              )}
             </Button>
-          </nav>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  <span className="hidden sm:inline">Profile</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         ) : (
           <Button asChild size="sm">
             <Link to="/auth">Login</Link>
           </Button>
         )}
-        
-        {/* Mobile menu button (implement mobile menu logic here) */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="md:hidden"
-        >
-          <span className="sr-only">Open menu</span>
-          {/* Icon for mobile menu */}
-        </Button>
       </div>
     </header>
   );

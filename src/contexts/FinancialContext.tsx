@@ -1,788 +1,753 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useUser } from './UserContext';
+
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useUser } from './UserContext';
 import { useToast } from '@/hooks/use-toast';
 
-// Define types for our financial data
-export type ExpenseType = 'permanent' | 'temporary';
-export type ExpenseCategory = 
-  'rent' | 'food' | 'subscription' | 'recharge' | 'travel' | 
-  'bill' | 'emi' | 'entertainment' | 'shopping' | 'other';
-
-export type SavingsType = 'sip' | 'mutual_fund' | 'gullak' | 'fixed_deposit' | 'other';
-export type TransactionType = 'expense' | 'income' | 'saving' | 'return';
-export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'once';
-
-export interface Expense {
+interface Expense {
   id: string;
+  userId: string;
   title: string;
   amount: number;
   date: string;
-  type: ExpenseType;
-  category: ExpenseCategory;
+  category: string;
+  type: string;
   description?: string;
-  frequency?: Frequency;
-  isSplit?: boolean;
+  frequency?: string;
+  isSplit: boolean;
   splitWith?: string;
-  splitStatus?: 'pending' | 'approved' | 'rejected';
+  splitStatus?: string;
   isValidated: boolean;
+  createdAt: string;
 }
 
-export interface Saving {
+interface Saving {
   id: string;
+  userId: string;
   title: string;
   amount: number;
   date: string;
   type: SavingsType;
   description?: string;
-  frequency: Frequency;
+  frequency: string;
   returnRate?: number;
-  returnFrequency?: Frequency;
+  returnFrequency?: string;
   isValidated: boolean;
+  createdAt: string;
 }
 
-export interface Transaction {
+interface Transaction {
   id: string;
+  userId: string;
+  type: string;
   title: string;
   amount: number;
   date: string;
-  type: TransactionType;
-  category?: ExpenseCategory | SavingsType;
+  category?: string;
   description?: string;
-  relatedId?: string; // Reference to the related expense or saving
+  relatedId?: string;
+  createdAt: string;
 }
 
-export interface ValidationItem {
+interface Validation {
   id: string;
+  userId: string;
+  type: string;
   title: string;
   amount: number;
-  type: 'expense_split' | 'saving' | 'future_expense';
   date: string;
-  expiresAt: string;
-  description?: string;
   relatedId: string;
+  description?: string;
   initiatedBy?: string;
+  createdAt: string;
+  expiresAt: string;
 }
 
-interface FinancialContextProps {
+export type SavingsType = 'sip' | 'mutual_fund' | 'gullak' | 'fixed_deposit' | 'other';
+
+interface FinancialContextType {
   expenses: Expense[];
   savings: Saving[];
   transactions: Transaction[];
-  validations: ValidationItem[];
+  validations: Validation[];
   remainingMoney: number;
   totalSaved: number;
-  addExpense: (expense: Omit<Expense, 'id' | 'isValidated'>) => Promise<string>;
-  addSaving: (saving: Omit<Saving, 'id' | 'isValidated'>) => Promise<string>;
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
-  validateItem: (id: string, isApproved: boolean) => Promise<void>;
-  getExpenseById: (id: string) => Expense | undefined;
-  getSavingById: (id: string) => Saving | undefined;
+  addExpense: (expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'isValidated'>) => Promise<void>;
+  addSaving: (saving: Omit<Saving, 'id' | 'userId' | 'createdAt' | 'isValidated'>) => Promise<void>;
+  validateItem: (id: string, approved: boolean) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
+  deleteSaving: (id: string) => Promise<void>;
   loading: boolean;
 }
 
-const FinancialContext = createContext<FinancialContextProps | undefined>(undefined);
+const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
 
-export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user, profile } = useUser();
-  const { toast } = useToast();
-  
-  // Initialize state
+interface FinancialProviderProps {
+  children: ReactNode;
+}
+
+export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [savings, setSavings] = useState<Saving[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [validations, setValidations] = useState<ValidationItem[]>([]);
-  const [remainingMoney, setRemainingMoney] = useState<number>(0);
-  const [totalSaved, setTotalSaved] = useState<number>(0);
+  const [validations, setValidations] = useState<Validation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const { user, profile } = useUser();
+  const { toast } = useToast();
   
-  // Load data from Supabase when user changes
+  // Calculate remaining money based on salary and expenses
+  const remainingMoney = React.useMemo(() => {
+    const monthlySalary = profile?.monthlySalary || 0;
+    const extraIncome = transactions
+      .filter(t => t.type === 'income' && t.category === 'extra_income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalExpenses = expenses
+      .filter(e => e.isValidated)
+      .reduce((sum, e) => sum + e.amount, 0);
+      
+    return monthlySalary + extraIncome - totalExpenses;
+  }, [profile, expenses, transactions]);
+  
+  // Calculate total saved money
+  const totalSaved = React.useMemo(() => {
+    return savings
+      .filter(s => s.isValidated)
+      .reduce((sum, s) => sum + s.amount, 0);
+  }, [savings]);
+  
+  // Fetch financial data when user is authenticated
   useEffect(() => {
     if (user) {
-      fetchExpenses();
-      fetchSavings();
-      fetchTransactions();
-      fetchValidations();
+      fetchData();
     } else {
       setExpenses([]);
       setSavings([]);
       setTransactions([]);
       setValidations([]);
-      setRemainingMoney(0);
-      setTotalSaved(0);
+      setLoading(false);
     }
   }, [user]);
   
-  // Fetch functions for getting data from Supabase
-  const fetchExpenses = async () => {
+  // Fetch all financial data from the database
+  const fetchData = async () => {
     if (!user) return;
     
+    setLoading(true);
+    
+    try {
+      await Promise.all([
+        fetchExpenses(),
+        fetchSavings(),
+        fetchTransactions(),
+        fetchValidations()
+      ]);
+    } catch (error) {
+      console.error("Error fetching financial data:", error);
+      toast({
+        title: "Error fetching data",
+        description: "Could not load your financial information.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Fetch expenses from the database
+  const fetchExpenses = async () => {
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
-      .eq('user_id', user.id);
-      
+      .eq('user_id', user!.id)
+      .order('date', { ascending: false });
+    
     if (error) {
-      console.error('Error fetching expenses:', error);
-      return;
+      throw error;
     }
     
     if (data) {
-      const mappedExpenses = data.map(item => ({
+      const formattedExpenses: Expense[] = data.map(item => ({
         id: item.id,
+        userId: item.user_id,
         title: item.title,
         amount: item.amount,
         date: item.date,
-        type: item.type as ExpenseType,
-        category: item.category as ExpenseCategory,
+        category: item.category,
+        type: item.type,
         description: item.description,
-        frequency: item.frequency as Frequency | undefined,
-        isSplit: item.is_split,
+        frequency: item.frequency,
+        isSplit: item.is_split || false,
         splitWith: item.split_with,
-        splitStatus: item.split_status as 'pending' | 'approved' | 'rejected' | undefined,
-        isValidated: item.is_validated
+        splitStatus: item.split_status,
+        isValidated: item.is_validated,
+        createdAt: item.created_at
       }));
-      setExpenses(mappedExpenses);
+      
+      setExpenses(formattedExpenses);
     }
-    setLoading(false);
   };
   
+  // Fetch savings from the database
   const fetchSavings = async () => {
-    if (!user) return;
-    
     const { data, error } = await supabase
       .from('savings')
       .select('*')
-      .eq('user_id', user.id);
-      
+      .eq('user_id', user!.id)
+      .order('date', { ascending: false });
+    
     if (error) {
-      console.error('Error fetching savings:', error);
-      return;
+      throw error;
     }
     
     if (data) {
-      const mappedSavings = data.map(item => ({
+      const formattedSavings: Saving[] = data.map(item => ({
         id: item.id,
+        userId: item.user_id,
         title: item.title,
         amount: item.amount,
         date: item.date,
         type: item.type as SavingsType,
         description: item.description,
-        frequency: item.frequency as Frequency,
+        frequency: item.frequency,
         returnRate: item.return_rate,
-        returnFrequency: item.return_frequency as Frequency | undefined,
-        isValidated: item.is_validated
+        returnFrequency: item.return_frequency,
+        isValidated: item.is_validated,
+        createdAt: item.created_at
       }));
-      setSavings(mappedSavings);
+      
+      setSavings(formattedSavings);
     }
-    setLoading(false);
   };
   
+  // Fetch transactions from the database
   const fetchTransactions = async () => {
-    if (!user) return;
-    
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .eq('user_id', user.id);
-      
+      .eq('user_id', user!.id)
+      .order('date', { ascending: false });
+    
     if (error) {
-      console.error('Error fetching transactions:', error);
-      return;
-    }
-    
-    if (data) {
-      const mappedTransactions = data.map(item => ({
-        id: item.id,
-        title: item.title,
-        amount: item.amount,
-        date: item.date,
-        type: item.type as TransactionType,
-        category: item.category as (ExpenseCategory | SavingsType) | undefined,
-        description: item.description,
-        relatedId: item.related_id
-      }));
-      setTransactions(mappedTransactions);
-    }
-    setLoading(false);
-  };
-  
-  const fetchValidations = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('validations')
-      .select('*')
-      .eq('user_id', user.id);
-      
-    if (error) {
-      console.error('Error fetching validations:', error);
-      return;
-    }
-    
-    if (data) {
-      const mappedValidations = data.map(item => ({
-        id: item.id,
-        title: item.title,
-        amount: item.amount,
-        type: item.type as 'expense_split' | 'saving' | 'future_expense',
-        date: item.date,
-        expiresAt: item.expires_at,
-        description: item.description,
-        relatedId: item.related_id,
-        initiatedBy: item.initiated_by
-      }));
-      setValidations(mappedValidations);
-    }
-    setLoading(false);
-  };
-  
-  // Calculate financial summaries
-  useEffect(() => {
-    if (!profile) {
-      setRemainingMoney(0);
-      return;
-    }
-    
-    // Calculate total expenses
-    const totalExpenses = expenses
-      .filter(expense => expense.isValidated)
-      .reduce((sum, expense) => sum + expense.amount, 0);
-    
-    // Calculate total savings
-    const totalSavingsAmount = savings
-      .filter(saving => saving.isValidated)
-      .reduce((sum, saving) => sum + saving.amount, 0);
-    
-    setTotalSaved(totalSavingsAmount);
-    
-    // Calculate additional income from transactions
-    const additionalIncome = transactions
-      .filter(transaction => transaction.type === 'income' || transaction.type === 'return')
-      .reduce((sum, transaction) => sum + transaction.amount, 0);
-    
-    // Calculate remaining money
-    const remaining = (profile?.monthlySalary || 0) + additionalIncome - totalExpenses - totalSavingsAmount;
-    setRemainingMoney(remaining);
-  }, [profile, expenses, savings, transactions]);
-  
-  // Add new expense
-  const addExpense = async (newExpense: Omit<Expense, 'id' | 'isValidated'>): Promise<string> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    // Check if expense date is in the future
-    const expenseDate = new Date(newExpense.date);
-    const currentDate = new Date();
-    const isFutureExpense = expenseDate > currentDate;
-    
-    // Calculate the effective amount based on split
-    let effectiveAmount = newExpense.amount;
-    if (newExpense.isSplit && newExpense.splitWith) {
-      // If expense is split, only half of it affects this user
-      effectiveAmount = newExpense.amount / 2;
-    }
-    
-    // If it's a future expense, add to validations instead
-    if (isFutureExpense && newExpense.type === 'temporary') {
-      // Add to expenses but mark as not validated
-      const { data: expenseData, error: expenseError } = await supabase
-        .from('expenses')
-        .insert([{
-          user_id: user.id,
-          title: newExpense.title,
-          amount: effectiveAmount, // Use the effective amount
-          date: newExpense.date,
-          type: newExpense.type,
-          category: newExpense.category,
-          description: newExpense.description,
-          frequency: newExpense.frequency,
-          is_split: newExpense.isSplit || false,
-          split_with: newExpense.splitWith,
-          split_status: newExpense.splitStatus,
-          is_validated: false
-        }])
-        .select('id')
-        .single();
-        
-      if (expenseError) {
-        console.error('Error creating expense:', expenseError);
-        throw expenseError;
-      }
-      
-      // Also add to validations
-      const validationExpires = expenseDate;
-      const { data: validationData, error: validationError } = await supabase
-        .from('validations')
-        .insert([{
-          user_id: user.id,
-          title: `Future expense: ${newExpense.title}`,
-          amount: effectiveAmount, // Use the effective amount
-          type: 'future_expense',
-          date: newExpense.date,
-          expires_at: expenseDate.toISOString(),
-          description: newExpense.description,
-          related_id: expenseData!.id
-        }])
-        .select('id')
-        .single();
-        
-      if (validationError) {
-        console.error('Error creating validation:', validationError);
-        throw validationError;
-      }
-      
-      // Update local state
-      const expense: Expense = {
-        ...newExpense,
-        id: expenseData!.id,
-        isValidated: false
-      };
-      
-      setExpenses(prev => [...prev, expense]);
-      
-      const validationItem: ValidationItem = {
-        id: validationData!.id,
-        title: `Future expense: ${newExpense.title}`,
-        amount: effectiveAmount, // Use the effective amount
-        type: 'future_expense',
-        date: newExpense.date,
-        expiresAt: expenseDate.toISOString(),
-        description: newExpense.description,
-        relatedId: expenseData!.id
-      };
-      
-      setValidations(prev => [...prev, validationItem]);
-      
-      toast({
-        title: "Future expense added",
-        description: "This expense will appear in your validations section until the scheduled date.",
-      });
-      
-      return expenseData!.id;
-    }
-    
-    // If it's a regular expense (temporary and not future, or permanent)
-    const { data, error } = await supabase
-      .from('expenses')
-      .insert([{
-        user_id: user.id,
-        title: newExpense.title,
-        amount: effectiveAmount, // Use the effective amount
-        date: newExpense.date,
-        type: newExpense.type,
-        category: newExpense.category,
-        description: newExpense.description,
-        frequency: newExpense.frequency,
-        is_split: newExpense.isSplit || false,
-        split_with: newExpense.splitWith,
-        split_status: newExpense.isSplit ? 'pending' : undefined,
-        is_validated: newExpense.type === 'temporary' && !isFutureExpense // Only temporary expenses that are not in the future are auto-validated
-      }])
-      .select('id')
-      .single();
-      
-    if (error) {
-      console.error('Error creating expense:', error);
       throw error;
     }
     
-    const expense: Expense = {
-      ...newExpense,
-      amount: effectiveAmount, // Use the effective amount
-      id: data!.id,
-      isValidated: newExpense.type === 'temporary' && !isFutureExpense
-    };
+    if (data) {
+      const formattedTransactions: Transaction[] = data.map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        type: item.type,
+        title: item.title,
+        amount: item.amount,
+        date: item.date,
+        category: item.category,
+        description: item.description,
+        relatedId: item.related_id,
+        createdAt: item.created_at
+      }));
+      
+      setTransactions(formattedTransactions);
+    }
+  };
+  
+  // Fetch validations from the database
+  const fetchValidations = async () => {
+    const { data, error } = await supabase
+      .from('validations')
+      .select('*')
+      .eq('user_id', user!.id)
+      .order('date', { ascending: false });
     
-    setExpenses(prev => [...prev, expense]);
-    
-    // Add to transactions if validated (temporary expenses that are not future)
-    if (newExpense.type === 'temporary' && !isFutureExpense) {
-      await addTransaction({
-        title: newExpense.title,
-        amount: effectiveAmount, // Use the effective amount
-        date: newExpense.date,
-        type: 'expense',
-        category: newExpense.category,
-        description: newExpense.description,
-        relatedId: data!.id
-      });
+    if (error) {
+      throw error;
     }
     
-    // If it's a split expense, add to validations for the other user
-    if (newExpense.isSplit && newExpense.splitWith) {
-      const validationExpires = new Date();
-      validationExpires.setDate(validationExpires.getDate() + 1); // 24 hours to validate
+    if (data) {
+      const formattedValidations: Validation[] = data.map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        type: item.type,
+        title: item.title,
+        amount: item.amount,
+        date: item.date,
+        relatedId: item.related_id,
+        description: item.description,
+        initiatedBy: item.initiated_by,
+        createdAt: item.created_at,
+        expiresAt: item.expires_at
+      }));
       
-      // Find the user with the provided username
+      setValidations(formattedValidations);
+    }
+  };
+
+  // Add a new expense to the database
+  const addExpense = async (expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'isValidated'>) => {
+    if (!user) return;
+    
+    try {
+      // If this is a split expense, we need to handle it differently
+      if (expense.isSplit && expense.splitWith) {
+        return await handleSplitExpense(expense);
+      }
+      
+      // Regular expense
+      const { data, error } = await supabase
+        .from('expenses')
+        .insert({
+          user_id: user.id,
+          title: expense.title,
+          amount: expense.amount,
+          date: expense.date,
+          category: expense.category,
+          type: expense.type,
+          description: expense.description,
+          frequency: expense.frequency,
+          is_split: expense.isSplit || false,
+          is_validated: true
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      // Record transaction
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'expense',
+          title: expense.title,
+          amount: expense.amount,
+          date: expense.date,
+          category: expense.category,
+          description: expense.description,
+          related_id: data?.[0]?.id
+        });
+      
+      await fetchData();
+      
+      toast({
+        title: "Expense added",
+        description: "Your expense has been recorded."
+      });
+    } catch (error) {
+      console.error("Error adding expense:", error);
+      toast({
+        title: "Error adding expense",
+        description: "Failed to add your expense.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle split expense functionality
+  const handleSplitExpense = async (expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'isValidated'>) => {
+    if (!user || !expense.splitWith) return;
+    
+    try {
+      // Find the other user by username
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('username', newExpense.splitWith)
+        .eq('username', expense.splitWith)
         .single();
-        
-      if (userError || !userData) {
-        console.error('Error finding user for split:', userError);
+      
+      if (userError) {
         toast({
           title: "User not found",
-          description: `Could not find user with username ${newExpense.splitWith}`,
+          description: `Could not find user "${expense.splitWith}"`,
           variant: "destructive"
         });
-      } else {
-        // Add validation for the other user
-        const { data: validationData, error: validationError } = await supabase
-          .from('validations')
-          .insert([{
-            user_id: userData.id, // The other user's ID
-            title: `Split expense: ${newExpense.title}`,
-            amount: effectiveAmount, // This is already half the total
-            type: 'expense_split',
-            date: newExpense.date,
-            expires_at: validationExpires.toISOString(),
-            description: newExpense.description,
-            related_id: data!.id,
-            initiated_by: user.id
-          }])
-          .select('id')
-          .single();
-          
-        if (validationError) {
-          console.error('Error creating validation for other user:', validationError);
-          toast({
-            title: "Split notification failed",
-            description: `Failed to notify ${newExpense.splitWith} about the split expense.`,
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Split expense added",
-            description: `${newExpense.splitWith} has been notified to approve this split expense.`,
-          });
-        }
+        throw userError;
       }
-    }
-    
-    return data!.id;
-  };
-  
-  // Add new saving
-  const addSaving = async (newSaving: Omit<Saving, 'id' | 'isValidated'>): Promise<string> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    const { data, error } = await supabase
-      .from('savings')
-      .insert([{
-        user_id: user.id,
-        title: newSaving.title,
-        amount: newSaving.amount,
-        date: newSaving.date,
-        type: newSaving.type,
-        description: newSaving.description,
-        frequency: newSaving.frequency,
-        return_rate: newSaving.returnRate,
-        return_frequency: newSaving.returnFrequency,
-        is_validated: false
-      }])
-      .select('id')
-      .single();
       
-    if (error) {
-      console.error('Error creating saving:', error);
-      throw error;
-    }
-    
-    const saving: Saving = {
-      ...newSaving,
-      id: data!.id,
-      isValidated: false
-    };
-    
-    setSavings(prev => [...prev, saving]);
-    
-    // Add to validations
-    const validationExpires = new Date();
-    
-    // Set expiration based on frequency
-    switch (newSaving.frequency) {
-      case 'daily':
-        validationExpires.setDate(validationExpires.getDate() + 1);
-        break;
-      case 'weekly':
-        validationExpires.setDate(validationExpires.getDate() + 7);
-        break;
-      case 'monthly':
-        validationExpires.setMonth(validationExpires.getMonth() + 1);
-        break;
-      default:
-        validationExpires.setDate(validationExpires.getDate() + 1);
-    }
-    
-    const { data: validationData, error: validationError } = await supabase
-      .from('validations')
-      .insert([{
-        user_id: user.id,
-        title: `Validate saving: ${newSaving.title}`,
-        amount: newSaving.amount,
-        type: 'saving',
-        date: newSaving.date,
-        expires_at: validationExpires.toISOString(),
-        description: newSaving.description,
-        related_id: data!.id
-      }])
-      .select('id')
-      .single();
-    
-    if (validationError) {
-      console.error('Error creating validation:', validationError);
-      throw validationError;
-    }
-    
-    const validationItem: ValidationItem = {
-      id: validationData!.id,
-      title: `Validate saving: ${newSaving.title}`,
-      amount: newSaving.amount,
-      type: 'saving',
-      date: newSaving.date,
-      expiresAt: validationExpires.toISOString(),
-      description: newSaving.description,
-      relatedId: data!.id
-    };
-    
-    setValidations(prev => [...prev, validationItem]);
-    
-    return data!.id;
-  };
-  
-  // Add transaction
-  const addTransaction = async (newTransaction: Omit<Transaction, 'id'>): Promise<void> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert([{
-        user_id: user.id,
-        title: newTransaction.title,
-        amount: newTransaction.amount,
-        date: newTransaction.date,
-        type: newTransaction.type,
-        category: newTransaction.category,
-        description: newTransaction.description,
-        related_id: newTransaction.relatedId
-      }])
-      .select('id')
-      .single();
+      if (!userData) {
+        toast({
+          title: "User not found",
+          description: `User "${expense.splitWith}" does not exist.`,
+          variant: "destructive"
+        });
+        return;
+      }
       
-    if (error) {
-      console.error('Error creating transaction:', error);
-      throw error;
-    }
-    
-    const transaction: Transaction = {
-      ...newTransaction,
-      id: data!.id
-    };
-    
-    setTransactions(prev => [...prev, transaction]);
-  };
-  
-  // Validate an item (expense split, saving, or future expense)
-  const validateItem = async (id: string, isApproved: boolean): Promise<void> => {
-    if (!user) throw new Error('User not authenticated');
-    
-    const validation = validations.find(v => v.id === id);
-    if (!validation) return;
-    
-    if (validation.type === 'expense_split') {
-      // Handle expense split validation
-      // Get the original expense details
-      const { data: originalExpense, error: fetchError } = await supabase
+      const otherUserId = userData.id;
+      
+      // Calculate split amount (50/50 split)
+      const splitAmount = expense.amount / 2;
+      
+      // Insert the expense for the current user (already validated)
+      const { data: currentUserExpense, error: expenseError } = await supabase
         .from('expenses')
-        .select('*')
-        .eq('id', validation.relatedId)
-        .single();
-        
-      if (fetchError || !originalExpense) {
-        console.error('Error fetching original expense:', fetchError);
-        throw fetchError;
-      }
+        .insert({
+          user_id: user.id,
+          title: expense.title,
+          amount: splitAmount, // Half of the total
+          date: expense.date,
+          category: expense.category,
+          type: expense.type,
+          description: expense.description,
+          frequency: expense.frequency,
+          is_split: true,
+          split_with: expense.splitWith,
+          split_status: 'initiated',
+          is_validated: true
+        })
+        .select();
       
-      if (isApproved) {
-        // Update the expense's split status
-        const { error } = await supabase
-          .from('expenses')
-          .update({ split_status: 'approved' })
-          .eq('id', validation.relatedId);
-          
-        if (error) {
-          console.error('Error updating expense:', error);
-          throw error;
-        }
-        
-        // Add a new expense for the current user (the one who approved)
-        const { error: createError } = await supabase
-          .from('expenses')
-          .insert([{
-            user_id: user.id,
-            title: `Split: ${originalExpense.title}`,
-            amount: validation.amount,
-            date: new Date().toISOString(),
-            type: originalExpense.type,
-            category: originalExpense.category,
-            description: `Split payment for ${originalExpense.title}`,
-            is_validated: true
-          }]);
-          
-        if (createError) {
-          console.error('Error creating expense for split:', createError);
-          throw createError;
-        }
-        
-        // Reload expenses
-        fetchExpenses();
-        
-        // Add a transaction for the split
-        await addTransaction({
-          title: `Split: ${originalExpense.title}`,
-          amount: validation.amount,
-          date: new Date().toISOString(),
+      if (expenseError) throw expenseError;
+      
+      // Create a validation request for the other user
+      const expireDate = new Date();
+      expireDate.setDate(expireDate.getDate() + 7); // Expires in 7 days
+      
+      await supabase
+        .from('validations')
+        .insert({
+          user_id: otherUserId,
+          type: 'split_expense',
+          title: `Split expense: ${expense.title}`,
+          amount: splitAmount,
+          date: expense.date,
+          related_id: currentUserExpense[0].id,
+          description: `${profile?.username || 'Someone'} wants to split this expense with you.`,
+          initiated_by: profile?.username || user.id,
+          expires_at: expireDate.toISOString()
+        });
+      
+      // Record transaction for current user
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
           type: 'expense',
-          category: originalExpense.category as ExpenseCategory,
-          description: `Split payment for ${originalExpense.title}`,
-          relatedId: validation.relatedId
+          title: `${expense.title} (Split)`,
+          amount: splitAmount,
+          date: expense.date,
+          category: expense.category,
+          description: `Split with ${expense.splitWith}`,
+          related_id: currentUserExpense[0].id
         });
-        
-        toast({
-          title: "Split expense approved",
-          description: `You have approved to pay ${validation.amount.toLocaleString()} for this split expense.`,
-        });
-      } else {
-        // Mark as rejected
-        const { error } = await supabase
-          .from('expenses')
-          .update({ split_status: 'rejected' })
-          .eq('id', validation.relatedId);
-          
-        if (error) {
-          console.error('Error updating expense:', error);
-          throw error;
-        }
-        
-        toast({
-          title: "Split expense rejected",
-          description: `You have rejected this split expense.`,
-        });
-        
-        // Notify the original creator
-        // This would be better implemented with a proper notification system
-        console.log(`User ${user.id} rejected split expense ${validation.relatedId}`);
-      }
-    } else if (validation.type === 'saving') {
-      // Handle saving validation
-      const saving = savings.find(s => s.id === validation.relatedId);
-      if (saving && isApproved) {
-        // Mark saving as validated
-        const { error } = await supabase
-          .from('savings')
-          .update({ is_validated: true })
-          .eq('id', saving.id);
-          
-        if (error) {
-          console.error('Error updating saving:', error);
-          throw error;
-        }
-        
-        setSavings(prev => 
-          prev.map(s => 
-            s.id === saving.id 
-              ? { ...s, isValidated: true } 
-              : s
-          )
-        );
-        
-        // Add a transaction for the saving
-        await addTransaction({
+      
+      await fetchData();
+      
+      toast({
+        title: "Split expense added",
+        description: `A split request has been sent to ${expense.splitWith}.`
+      });
+    } catch (error) {
+      console.error("Error with split expense:", error);
+      toast({
+        title: "Error with split expense",
+        description: "Failed to process split expense.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Add a new saving to the database
+  const addSaving = async (saving: Omit<Saving, 'id' | 'userId' | 'createdAt' | 'isValidated'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('savings')
+        .insert({
+          user_id: user.id,
           title: saving.title,
           amount: saving.amount,
-          date: new Date().toISOString(),
+          date: saving.date,
+          type: saving.type,
+          description: saving.description,
+          frequency: saving.frequency,
+          return_rate: saving.returnRate,
+          return_frequency: saving.returnFrequency,
+          is_validated: true
+        })
+        .select();
+      
+      if (error) throw error;
+      
+      // Record transaction
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
           type: 'saving',
+          title: saving.title,
+          amount: saving.amount,
+          date: saving.date,
           category: saving.type,
           description: saving.description,
-          relatedId: saving.id
+          related_id: data?.[0]?.id
         });
+
+      // If saving has a return rate and frequency, calculate potential returns
+      if (saving.returnRate && saving.returnFrequency) {
+        await handleSavingsReturns(saving, data?.[0]?.id);
       }
-    } else if (validation.type === 'future_expense') {
-      // Handle future expense validation
-      const expense = expenses.find(e => e.id === validation.relatedId);
-      if (expense) {
-        if (isApproved) {
-          // Mark expense as validated
-          const { error } = await supabase
-            .from('expenses')
-            .update({ is_validated: true })
-            .eq('id', expense.id);
-            
-          if (error) {
-            console.error('Error updating expense:', error);
-            throw error;
-          }
-          
-          setExpenses(prev => 
-            prev.map(e => 
-              e.id === expense.id 
-                ? { ...e, isValidated: true } 
-                : e
-            )
-          );
-          
-          // Add a transaction for the expense
-          await addTransaction({
-            title: expense.title,
-            amount: expense.amount,
-            date: new Date().toISOString(),
-            type: 'expense',
-            category: expense.category,
-            description: expense.description,
-            relatedId: expense.id
-          });
-        } else {
-          // Delete the expense if rejected
-          const { error: deleteError } = await supabase
-            .from('expenses')
-            .delete()
-            .eq('id', expense.id);
-            
-          if (deleteError) {
-            console.error('Error deleting expense:', deleteError);
-            throw deleteError;
-          }
-          
-          setExpenses(prev => prev.filter(e => e.id !== expense.id));
-        }
-      }
-    }
-    
-    // Remove the validation item
-    const { error } = await supabase
-      .from('validations')
-      .delete()
-      .eq('id', id);
       
-    if (error) {
-      console.error('Error deleting validation:', error);
+      await fetchData();
+      
+      toast({
+        title: "Saving added",
+        description: "Your saving has been recorded."
+      });
+    } catch (error) {
+      console.error("Error adding saving:", error);
+      toast({
+        title: "Error adding saving",
+        description: "Failed to add your saving.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle savings returns calculations
+  const handleSavingsReturns = async (saving: Omit<Saving, 'id' | 'userId' | 'createdAt' | 'isValidated'>, savingId: string) => {
+    if (!saving.returnRate || !saving.returnFrequency) return;
+    
+    try {
+      // Calculate return amount based on frequency
+      const returnAmount = saving.amount * (saving.returnRate / 100);
+      const returnDate = new Date(saving.date);
+      
+      // Depending on return frequency, set appropriate date for the return
+      switch (saving.returnFrequency) {
+        case 'daily':
+          returnDate.setDate(returnDate.getDate() + 1);
+          break;
+        case 'weekly':
+          returnDate.setDate(returnDate.getDate() + 7);
+          break;
+        case 'monthly':
+          returnDate.setMonth(returnDate.getMonth() + 1);
+          break;
+        case 'quarterly':
+          returnDate.setMonth(returnDate.getMonth() + 3);
+          break;
+        case 'yearly':
+          returnDate.setFullYear(returnDate.getFullYear() + 1);
+          break;
+        default:
+          // If unknown frequency, don't create a return
+          return;
+      }
+      
+      // Create transaction for the return (as a future income)
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user!.id,
+          type: 'income',
+          title: `Return on ${saving.title}`,
+          amount: returnAmount,
+          date: returnDate.toISOString(),
+          category: 'investment_return',
+          description: `${saving.returnRate}% return on ${saving.title}`,
+          related_id: savingId
+        });
+      
+    } catch (error) {
+      console.error("Error processing savings returns:", error);
+    }
+  };
+
+  // Validate or reject a pending validation item
+  const validateItem = async (id: string, approved: boolean) => {
+    if (!user) return;
+    
+    try {
+      // Get the validation item first
+      const { data: validationData, error: validationError } = await supabase
+        .from('validations')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (validationError) throw validationError;
+      if (!validationData) {
+        toast({
+          title: "Validation not found",
+          description: "The validation item could not be found.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Handle different validation types
+      switch (validationData.type) {
+        case 'split_expense':
+          await handleSplitExpenseValidation(validationData, approved);
+          break;
+        case 'future_expense':
+          // Handle future expense validation
+          break;
+        default:
+          // Unknown validation type
+          console.warn("Unknown validation type:", validationData.type);
+      }
+      
+      // Delete the validation item
+      await supabase
+        .from('validations')
+        .delete()
+        .eq('id', id);
+      
+      await fetchData();
+      
+      toast({
+        title: approved ? "Request approved" : "Request rejected",
+        description: approved ? "The request has been approved." : "The request has been rejected."
+      });
+    } catch (error) {
+      console.error("Error validating item:", error);
+      toast({
+        title: "Error processing validation",
+        description: "Failed to process the validation.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle split expense validation logic
+  const handleSplitExpenseValidation = async (validation: any, approved: boolean) => {
+    if (!user) return;
+    
+    try {
+      if (approved) {
+        // Get the original expense to update its status
+        const { data: originalExpense, error: expenseError } = await supabase
+          .from('expenses')
+          .select('*')
+          .eq('id', validation.related_id)
+          .single();
+        
+        if (expenseError) throw expenseError;
+        
+        // Create a new expense for the current user
+        await supabase
+          .from('expenses')
+          .insert({
+            user_id: user.id,
+            title: validation.title.replace('Split expense: ', ''),
+            amount: validation.amount,
+            date: validation.date,
+            category: originalExpense?.category || 'other',
+            type: originalExpense?.type || 'regular',
+            description: `Split expense with ${validation.initiated_by || 'someone'}`,
+            is_split: true,
+            split_with: validation.initiated_by,
+            split_status: 'accepted',
+            is_validated: true
+          });
+        
+        // Update the original expense status
+        await supabase
+          .from('expenses')
+          .update({
+            split_status: 'accepted'
+          })
+          .eq('id', validation.related_id);
+        
+        // Record transaction for the current user
+        await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            type: 'expense',
+            title: validation.title.replace('Split expense: ', ''),
+            amount: validation.amount,
+            date: validation.date,
+            category: originalExpense?.category || 'other',
+            description: `Split expense with ${validation.initiated_by || 'someone'}`,
+            related_id: validation.related_id
+          });
+      } else {
+        // Rejected split - update the original expense status
+        await supabase
+          .from('expenses')
+          .update({
+            split_status: 'rejected'
+          })
+          .eq('id', validation.related_id);
+      }
+    } catch (error) {
+      console.error("Error handling split expense validation:", error);
       throw error;
     }
+  };
+
+  // Delete an expense
+  const deleteExpense = async (id: string) => {
+    if (!user) return;
     
-    setValidations(prev => prev.filter(v => v.id !== id));
+    try {
+      // Delete the expense
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Delete associated transactions
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('related_id', id);
+      
+      await fetchData();
+      
+      toast({
+        title: "Expense deleted",
+        description: "Your expense has been removed."
+      });
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      toast({
+        title: "Error deleting expense",
+        description: "Failed to delete the expense.",
+        variant: "destructive"
+      });
+    }
   };
-  
-  // Utility functions to get expenses and savings by ID
-  const getExpenseById = (id: string): Expense | undefined => {
-    return expenses.find(e => e.id === id);
+
+  // Delete a saving
+  const deleteSaving = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      // Delete the saving
+      const { error } = await supabase
+        .from('savings')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Delete associated transactions
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('related_id', id);
+      
+      await fetchData();
+      
+      toast({
+        title: "Saving deleted",
+        description: "Your saving has been removed."
+      });
+    } catch (error) {
+      console.error("Error deleting saving:", error);
+      toast({
+        title: "Error deleting saving",
+        description: "Failed to delete the saving.",
+        variant: "destructive"
+      });
+    }
   };
-  
-  const getSavingById = (id: string): Saving | undefined => {
-    return savings.find(s => s.id === id);
-  };
-  
-  const contextValue: FinancialContextProps = {
+
+  const value = {
     expenses,
     savings,
     transactions,
@@ -791,23 +756,22 @@ export const FinancialProvider: React.FC<{ children: ReactNode }> = ({ children 
     totalSaved,
     addExpense,
     addSaving,
-    addTransaction,
     validateItem,
-    getExpenseById,
-    getSavingById,
+    deleteExpense,
+    deleteSaving,
     loading
   };
-  
+
   return (
-    <FinancialContext.Provider value={contextValue}>
+    <FinancialContext.Provider value={value}>
       {children}
     </FinancialContext.Provider>
   );
 };
 
-export const useFinancial = (): FinancialContextProps => {
+export const useFinancial = (): FinancialContextType => {
   const context = useContext(FinancialContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useFinancial must be used within a FinancialProvider');
   }
   return context;

@@ -5,6 +5,7 @@ import AppHeader from './AppHeader';
 import { Toaster } from "@/components/ui/toaster";
 import { useUser } from '@/contexts/UserContext';
 import { Loader2 } from 'lucide-react';
+import AppSidebar from './AppSidebar';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -42,11 +43,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-white">
       <AppHeader />
-      <main className="flex-1 container mx-auto py-6 px-4 md:px-6">
-        {children}
-      </main>
+      <div className="flex flex-1">
+        {showNav && user && isProfileComplete && <AppSidebar />}
+        <main className="flex-1 container mx-auto py-6 px-4 md:px-6">
+          {children}
+        </main>
+      </div>
       <Toaster />
     </div>
   );
