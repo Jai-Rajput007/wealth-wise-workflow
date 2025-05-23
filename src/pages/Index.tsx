@@ -8,6 +8,7 @@ import RecentTransactionsList from '@/components/dashboard/RecentTransactionsLis
 import SavingsProgressCard from '@/components/dashboard/SavingsProgressCard';
 import { useFinancial } from '@/contexts/FinancialContext';
 import { useUser } from '@/contexts/UserContext';
+import { motion } from 'framer-motion';
 
 const Index = () => {
   const { expenses, transactions, remainingMoney, totalSaved } = useFinancial();
@@ -34,31 +35,55 @@ const Index = () => {
   if (!isProfileComplete) {
     return <Navigate to="/salary-setup" replace />;
   }
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15
+      }
+    }
+  };
+  
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
   
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+      <motion.div 
+        className="space-y-6"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.h1 className="text-3xl font-bold text-blue-700" variants={itemVariants}>
+          Dashboard
+        </motion.h1>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="col-span-1 md:col-span-2 lg:col-span-3">
-            <BalanceCard 
-              remainingMoney={remainingMoney} 
-              totalSaved={totalSaved}
-              recentExpenses={recentExpensesTotal}
-            />
+        <motion.div variants={itemVariants}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="col-span-1 md:col-span-2 lg:col-span-3">
+              <BalanceCard 
+                remainingMoney={remainingMoney} 
+                totalSaved={totalSaved}
+                recentExpenses={recentExpensesTotal}
+              />
+            </div>
           </div>
-        </div>
+        </motion.div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div className="grid grid-cols-1 lg:grid-cols-2 gap-6" variants={itemVariants}>
           <ExpensesChart />
           <SavingsProgressCard />
-        </div>
+        </motion.div>
         
-        <div>
+        <motion.div variants={itemVariants}>
           <RecentTransactionsList />
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </DashboardLayout>
   );
 };

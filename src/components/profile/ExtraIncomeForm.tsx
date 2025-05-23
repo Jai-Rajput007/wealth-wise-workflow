@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast as sonnerToast } from "sonner";
+import { motion } from "framer-motion";
 
 // Create schema for form validation
 const formSchema = z.object({
@@ -55,6 +57,11 @@ const ExtraIncomeForm: React.FC = () => {
         title: 'Extra income added',
         description: `Added ₹${data.amount} to your balance`,
       });
+      
+      sonnerToast.success(`Added ₹${data.amount} to your balance`, {
+        description: 'Your extra income has been added successfully',
+        duration: 3000,
+      });
     } catch (error) {
       console.error('Error adding income:', error);
       toast({
@@ -66,67 +73,89 @@ const ExtraIncomeForm: React.FC = () => {
   };
   
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add Extra Income</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Income Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Bonus, Gift, etc." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount (₹)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      placeholder="5000" 
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Details about this income" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <Button type="submit">Add Income</Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-white border-b border-gray-100">
+          <CardTitle className="text-blue-700">Add Extra Income</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-blue-700">Income Title</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Bonus, Gift, etc." 
+                        {...field} 
+                        className="border-gray-200 focus:border-blue-300 focus:ring-blue-300"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-blue-700">Amount (₹)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="5000" 
+                        {...field}
+                        className="border-gray-200 focus:border-blue-300 focus:ring-blue-300"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-blue-700">Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Details about this income" 
+                        {...field} 
+                        className="border-gray-200 focus:border-blue-300 focus:ring-blue-300"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Button 
+                  type="submit" 
+                  className="w-full bg-green-600 hover:bg-green-700 text-white transition-colors"
+                >
+                  Add Income
+                </Button>
+              </motion.div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 };
 

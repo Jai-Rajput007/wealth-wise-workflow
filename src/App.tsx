@@ -25,12 +25,13 @@ const App = () => (
       <UserProvider>
         <FinancialProvider>
           <Toaster />
-          <Sonner />
+          <Sonner position="top-right" closeButton theme="light" richColors />
           <BrowserRouter>
             <Routes>
+              <Route path="/" element={<Navigate to="/auth" replace />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/salary-setup" element={<SalarySetupPage />} />
-              <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<Index />} />
               <Route path="/expenses" element={<ExpensePage />} />
               <Route path="/savings" element={<SavingsPage />} />
               <Route path="/history" element={<HistoryPage />} />

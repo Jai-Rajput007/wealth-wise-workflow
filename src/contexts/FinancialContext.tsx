@@ -291,9 +291,42 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     if (!user) return;
     
     try {
+      const expenseDate = new Date(expense.date);
+      const currentDate = new Date();
+      
+      // Check if this is a future expense (scheduled for future date)
+      const isFutureExpense = expenseDate > currentDate;
+      
       // If this is a split expense, we need to handle it differently
       if (expense.isSplit && expense.splitWith) {
         return await handleSplitExpense(expense);
+      }
+      
+      // For future expenses, create a validation request
+      if (isFutureExpense) {
+        const { data, error } = await supabase
+          .from('validations')
+          .insert({
+            user_id: user.id,
+            type: 'future_expense',
+            title: expense.title,
+            amount: expense.amount,
+            date: expense.date,
+            related_id: user.id, // Using user.id as placeholder since we don't have an expense id yet
+            description: expense.description || 'Scheduled expense',
+            expires_at: expense.date // Expires on the scheduled date
+          })
+          .select();
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Expense scheduled",
+          description: `Your expense has been scheduled for ${new Date(expense.date).toLocaleDateString()}`
+        });
+        
+        await fetchData();
+        return;
       }
       
       // Regular expense
@@ -455,6 +488,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     if (!user) return;
     
     try {
+      // Check if this saving should be validated immediately or put in validations
+      let shouldValidateImmediately = true;
+      
+      // Always create a validated savings entry
       const { data, error } = await supabase
         .from('savings')
         .insert({
@@ -510,7 +547,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
 
   // Handle savings returns calculations
   const handleSavingsReturns = async (saving: Omit<Saving, 'id' | 'userId' | 'createdAt' | 'isValidated'>, savingId: string) => {
-    if (!saving.returnRate || !saving.returnFrequency) return;
+    if (!saving.returnRate || !saving.returnFrequency || !user) return;
     
     try {
       // Calculate return amount based on frequency
@@ -539,20 +576,24 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
           return;
       }
       
-      // Create transaction for the return (as a future income)
-      await supabase
-        .from('transactions')
+      // Create a validation request for the return
+      const { data, error } = await supabase
+        .from('validations')
         .insert({
-          user_id: user!.id,
-          type: 'return',
+          user_id: user.id,
+          type: 'saving_return',
           title: `Return on ${saving.title}`,
           amount: returnAmount,
           date: returnDate.toISOString(),
-          category: 'investment_return',
-          description: `${saving.returnRate}% return on ${saving.title}`,
-          related_id: savingId
-        });
+          related_id: savingId,
+          description: `${saving.returnRate}% return on your ${saving.title} investment`,
+          expires_at: new Date(returnDate.getTime() + 24 * 60 * 60 * 1000).toISOString() // Expires 1 day after return date
+        })
+        .select();
       
+      if (error) {
+        console.error("Error creating return validation:", error);
+      }
     } catch (error) {
       console.error("Error processing savings returns:", error);
     }
@@ -564,7 +605,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     
     try {
       // Record transaction for the income
-      await supabase
+      const { error } = await supabase
         .from('transactions')
         .insert({
           user_id: user.id,
@@ -575,6 +616,8 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
           category: 'extra_income',
           description: description || 'Extra income'
         });
+      
+      if (error) throw error;
       
       await fetchData();
       
@@ -620,7 +663,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
           await handleSplitExpenseValidation(validationData, approved);
           break;
         case 'future_expense':
-          // Handle future expense validation
+          await handleFutureExpenseValidation(validationData, approved);
+          break;
+        case 'saving_return':
+          await handleSavingReturnValidation(validationData, approved);
           break;
         default:
           // Unknown validation type
@@ -673,7 +719,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
             amount: validation.amount,
             date: validation.date,
             category: originalExpense?.category || 'other',
-            type: originalExpense?.type || 'regular',
+            type: originalExpense?.type || 'temporary',
             description: `Split expense with ${validation.initiated_by || 'someone'}`,
             is_split: true,
             split_with: validation.initiated_by,
@@ -716,6 +762,74 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       }
     } catch (error) {
       console.error("Error handling split expense validation:", error);
+      throw error;
+    }
+  };
+
+  // Handle future expense validation logic
+  const handleFutureExpenseValidation = async (validation: any, approved: boolean) => {
+    if (!user) return;
+    
+    try {
+      if (approved) {
+        // Create the expense now that it's approved
+        const { data: newExpense, error: expenseError } = await supabase
+          .from('expenses')
+          .insert({
+            user_id: user.id,
+            title: validation.title,
+            amount: validation.amount,
+            date: validation.date,
+            category: 'other', // Default category
+            type: 'temporary', // Default type
+            description: validation.description,
+            is_validated: true
+          })
+          .select();
+        
+        if (expenseError) throw expenseError;
+        
+        // Record transaction
+        await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            type: 'expense',
+            title: validation.title,
+            amount: validation.amount,
+            date: validation.date,
+            description: validation.description,
+            related_id: newExpense?.[0]?.id
+          });
+      }
+    } catch (error) {
+      console.error("Error handling future expense validation:", error);
+      throw error;
+    }
+  };
+
+  // Handle saving return validation logic
+  const handleSavingReturnValidation = async (validation: any, approved: boolean) => {
+    if (!user) return;
+    
+    try {
+      if (approved) {
+        // Add the return as income
+        await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            type: 'return',
+            title: validation.title,
+            amount: validation.amount,
+            date: new Date().toISOString(),
+            category: 'investment_return',
+            description: validation.description,
+            related_id: validation.related_id
+          });
+      }
+    } catch (error) {
+      console.error("Error handling saving return validation:", error);
       throw error;
     }
   };
