@@ -16,6 +16,7 @@ interface UserContextType {
   session: Session | null;
   profile: UserProfile | null;
   isProfileComplete: boolean;
+  hasSalarySetup: boolean;
   updateProfile: (profile: UserProfile) => Promise<void>;
   addExtraIncome: (amount: number, description: string) => Promise<void>;
   resetProfile: () => void;
@@ -38,6 +39,19 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [hasSalarySetup, setHasSalarySetup] = useState<boolean>(false);
+  
+  // Helper function to clean up auth tokens
+  const cleanupAuthState = () => {
+    // Remove standard auth tokens
+    localStorage.removeItem('supabase.auth.token');
+    // Remove all Supabase auth keys from localStorage
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        localStorage.removeItem(key);
+      }
+    });
+  };
   
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -52,6 +66,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }, 0);
         } else {
           setProfile(null);
+          setHasSalarySetup(false);
         }
       }
     );
@@ -63,8 +78,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (session?.user) {
         fetchUserProfile(session.user.id);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -80,6 +96,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (error) {
       console.error('Error fetching profile:', error);
       setProfile(null);
+      setHasSalarySetup(false);
       setLoading(false);
       return;
     }
@@ -93,8 +110,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         monthlySalary: data.monthly_salary || 0
       };
       setProfile(userProfile);
+      setHasSalarySetup(data.monthly_salary > 0);
     } else {
       setProfile(null);
+      setHasSalarySetup(false);
     }
     
     setLoading(false);
@@ -120,6 +139,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     
     setProfile(newProfile);
+    setHasSalarySetup(newProfile.monthlySalary > 0);
   };
   
   const addExtraIncome = async (amount: number, description: string) => {
@@ -147,23 +167,32 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const resetProfile = () => {
     localStorage.removeItem('userProfile');
     setProfile(null);
+    setHasSalarySetup(false);
   };
   
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
+    cleanupAuthState();
+    
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
     if (error) {
       console.error('Error logging out:', error);
     }
+    
     setProfile(null);
     setUser(null);
     setSession(null);
+    setHasSalarySetup(false);
+    
+    // Force page reload for clean state
+    window.location.href = '/auth';
   };
   
   const value = {
     user,
     session,
     profile,
-    isProfileComplete: !!profile && !!profile.name && !!profile.email && !!profile.username && profile.monthlySalary > 0,
+    isProfileComplete: !!profile && !!profile.name && !!profile.email && !!profile.username,
+    hasSalarySetup,
     updateProfile,
     addExtraIncome,
     resetProfile,

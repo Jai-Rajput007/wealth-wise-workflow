@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useUser } from '@/contexts/UserContext';
@@ -29,10 +29,17 @@ const salarySchema = z.object({
 type SalaryFormValues = z.infer<typeof salarySchema>;
 
 const SalarySetupPage: React.FC = () => {
-  const { profile, updateProfile } = useUser();
+  const { profile, updateProfile, hasSalarySetup } = useUser();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // If user already has salary setup, redirect to dashboard
+    if (hasSalarySetup) {
+      navigate('/dashboard');
+    }
+  }, [hasSalarySetup, navigate]);
 
   const form = useForm<SalaryFormValues>({
     resolver: zodResolver(salarySchema),
@@ -61,7 +68,7 @@ const SalarySetupPage: React.FC = () => {
         description: "Your monthly salary has been set successfully."
       });
       
-      navigate('/');
+      navigate('/dashboard');
     } catch (error: any) {
       toast({
         title: "Error",

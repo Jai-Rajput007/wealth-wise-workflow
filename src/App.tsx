@@ -28,7 +28,7 @@ const App = () => (
           <Sonner position="top-right" closeButton theme="light" richColors />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Navigate to="/auth" replace />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/salary-setup" element={<SalarySetupPage />} />
               <Route path="/dashboard" element={<Index />} />

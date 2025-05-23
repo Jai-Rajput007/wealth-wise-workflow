@@ -54,6 +54,7 @@ const AuthPage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>("login");
   
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -74,10 +75,33 @@ const AuthPage: React.FC = () => {
     },
   });
   
+  // Helper function to clean up auth tokens
+  const cleanupAuthState = () => {
+    // Remove standard auth tokens
+    localStorage.removeItem('supabase.auth.token');
+    // Remove all Supabase auth keys from localStorage
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        localStorage.removeItem(key);
+      }
+    });
+  };
+  
   // Handle login submission
   const onLoginSubmit = async (data: LoginFormValues) => {
     try {
       setIsLoading(true);
+      
+      // Clean up existing tokens first
+      cleanupAuthState();
+      
+      // Attempt global sign out
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+      } catch (err) {
+        // Continue even if this fails
+      }
+      
       const { error } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
@@ -92,7 +116,8 @@ const AuthPage: React.FC = () => {
         description: 'Welcome back!',
       });
       
-      navigate('/');
+      // Force page reload for clean state
+      window.location.href = '/dashboard';
       
     } catch (error: any) {
       toast({
@@ -145,18 +170,15 @@ const AuthPage: React.FC = () => {
       
       toast({
         title: 'Signup successful',
-        description: 'Your account has been created.',
+        description: 'Your account has been created. You can now log in.',
       });
       
-      // Automatically login after signup
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
+      // Clear the form
+      signupForm.reset();
       
-      if (loginError) throw loginError;
-      
-      navigate('/');
+      // Switch to login tab instead of automatically logging in
+      setActiveTab("login");
+      loginForm.setValue("email", data.email);
       
     } catch (error: any) {
       toast({
@@ -179,7 +201,7 @@ const AuthPage: React.FC = () => {
   }
   
   if (user && !loading) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
   
   return (
@@ -196,7 +218,7 @@ const AuthPage: React.FC = () => {
             <CardDescription>Sign in to your account or create a new one</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid grid-cols-2 mb-4 bg-white">
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
