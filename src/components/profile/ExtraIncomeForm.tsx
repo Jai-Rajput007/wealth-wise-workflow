@@ -45,7 +45,8 @@ const ExtraIncomeForm: React.FC = () => {
   
   const onSubmit = async (data: FormValues) => {
     try {
-      await addIncome(data.amount, data.title, data.description);
+      // Ensure we pass all required parameters and await the result
+      await addIncome(data.amount, data.title, data.description || '');
       
       form.reset({
         title: '',

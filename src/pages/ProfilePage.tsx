@@ -19,6 +19,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/contexts/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Separator } from '@/components/ui/separator';
+import { toast as sonnerToast } from 'sonner';
+import ExtraIncomeForm from '@/components/profile/ExtraIncomeForm';
 
 // Define the profile form schema
 const profileSchema = z.object({
@@ -29,20 +31,12 @@ const profileSchema = z.object({
   monthlySalary: z.coerce.number().nonnegative('Monthly salary cannot be negative.')
 });
 
-// Define the extra income form schema
-const extraIncomeSchema = z.object({
-  amount: z.coerce.number().positive('Amount must be positive.'),
-  description: z.string().min(3, 'Description must be at least 3 characters.')
-});
-
 type ProfileFormValues = z.infer<typeof profileSchema>;
-type ExtraIncomeFormValues = z.infer<typeof extraIncomeSchema>;
 
 const ProfilePage = () => {
-  const { user, profile, updateProfile, addExtraIncome } = useUser();
+  const { user, profile, updateProfile } = useUser();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [isAddingIncome, setIsAddingIncome] = useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -53,14 +47,6 @@ const ProfilePage = () => {
       phoneNumber: profile?.phoneNumber || '',
       monthlySalary: profile?.monthlySalary || 0
     },
-  });
-
-  const incomeForm = useForm<ExtraIncomeFormValues>({
-    resolver: zodResolver(extraIncomeSchema),
-    defaultValues: {
-      amount: 0,
-      description: ''
-    }
   });
 
   useEffect(() => {
@@ -95,6 +81,10 @@ const ProfilePage = () => {
         title: "Profile updated",
         description: "Your profile has been updated successfully."
       });
+      
+      sonnerToast.success("Profile updated", {
+        description: "Your profile has been updated successfully."
+      });
     } catch (error) {
       console.error("Error updating profile:", error);
       toast({
@@ -107,35 +97,6 @@ const ProfilePage = () => {
     }
   };
 
-  const onExtraIncomeSubmit = async (values: ExtraIncomeFormValues) => {
-    if (!user) return;
-    
-    setIsAddingIncome(true);
-    
-    try {
-      await addExtraIncome(values.amount, values.description);
-      
-      toast({
-        title: "Extra income added",
-        description: `Added ${values.amount} to your balance.`
-      });
-      
-      incomeForm.reset({
-        amount: 0,
-        description: ''
-      });
-    } catch (error) {
-      console.error("Error adding extra income:", error);
-      toast({
-        title: "Error",
-        description: "There was a problem adding your extra income.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsAddingIncome(false);
-    }
-  };
-
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-8">
@@ -143,7 +104,7 @@ const ProfilePage = () => {
 
         <Card className="border border-gray-200 shadow-sm bg-white">
           <CardHeader className="bg-white border-b border-gray-100">
-            <CardTitle>Your Profile</CardTitle>
+            <CardTitle>Your ExpenseChecker Profile</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <Form {...profileForm}>
@@ -230,50 +191,7 @@ const ProfilePage = () => {
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 shadow-sm bg-white">
-          <CardHeader className="bg-white border-b border-gray-100">
-            <CardTitle>Add Extra Income</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <Form {...incomeForm}>
-              <form onSubmit={incomeForm.handleSubmit(onExtraIncomeSubmit)} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <FormField
-                    control={incomeForm.control}
-                    name="amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Amount</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="1000" {...field} className="border-gray-200" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={incomeForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Bonus, Gift, etc." {...field} className="border-gray-200" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <Button type="submit" disabled={isAddingIncome} className="bg-green-600 hover:bg-green-700 text-white">
-                  {isAddingIncome ? "Adding..." : "Add Extra Income"}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+        <ExtraIncomeForm />
       </div>
     </DashboardLayout>
   );

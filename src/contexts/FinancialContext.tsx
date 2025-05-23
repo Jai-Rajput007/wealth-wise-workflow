@@ -103,6 +103,8 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
   // Calculate remaining money based on salary and expenses
   const remainingMoney = React.useMemo(() => {
     const monthlySalary = profile?.monthlySalary || 0;
+    
+    // Ensure we're correctly summing up all income transactions
     const extraIncome = transactions
       .filter(t => t.type === 'income' || t.type === 'return')
       .reduce((sum, t) => sum + t.amount, 0);
@@ -614,13 +616,17 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
           description: description || 'Extra income'
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error adding income to database:", error);
+        throw error;
+      }
       
-      await fetchData();
+      // Refetch transactions to update the UI
+      await fetchTransactions();
       
       toast({
         title: "Income added",
-        description: `Added ${amount} to your balance.`
+        description: `Added ₹${amount} to your balance.`
       });
     } catch (error) {
       console.error("Error adding income:", error);
@@ -629,6 +635,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
         description: "Failed to add your income.",
         variant: "destructive"
       });
+      throw error; // Re-throw to handle in the form
     }
   };
 

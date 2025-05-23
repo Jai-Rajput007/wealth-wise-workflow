@@ -31,7 +31,7 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
         <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-400 text-white pb-2">
           <CardTitle className="text-xl flex justify-between items-center">
             <span className="flex items-center">
-              <Wallet className="mr-2 h-5 w-5" /> Available Balance
+              <Wallet className="mr-2 h-5 w-5" /> ExpenseChecker Balance
             </span>
             <span className="text-lg opacity-75 font-normal">Today</span>
           </CardTitle>

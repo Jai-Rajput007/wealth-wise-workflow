@@ -63,7 +63,7 @@ const AppSidebar: React.FC = () => {
         {/* User info */}
         {profile && (
           <div className="px-4 py-4 mb-4 border-b border-gray-100">
-            <p className="text-sm font-medium text-gray-700">Welcome,</p>
+            <p className="text-sm font-medium text-gray-700">Welcome to ExpenseChecker,</p>
             <p className="font-bold text-blue-700">{profile.username}</p>
           </div>
         )}
