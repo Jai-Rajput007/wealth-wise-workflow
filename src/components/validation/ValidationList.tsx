@@ -6,7 +6,7 @@ import { Check, X, Calendar, BellRing } from 'lucide-react';
 import { useFinancial } from '@/contexts/FinancialContext';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { toast as sonnerToast } from 'sonner';
 
 const ValidationList: React.FC = () => {
@@ -34,7 +34,8 @@ const ValidationList: React.FC = () => {
     }
   };
 
-  const container = {
+  // Define proper animation variants
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -44,7 +45,7 @@ const ValidationList: React.FC = () => {
     }
   };
   
-  const item = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0 }
   };
@@ -94,7 +95,7 @@ const ValidationList: React.FC = () => {
         <CardContent className="p-0">
           <motion.ul 
             className="divide-y"
-            variants={container}
+            variants={containerVariants}
             initial="hidden"
             animate="show"
           >
@@ -102,7 +103,7 @@ const ValidationList: React.FC = () => {
               <motion.li 
                 key={item.id} 
                 className="p-4 hover:bg-gray-50 transition-colors"
-                variants={item}
+                variants={itemVariants}
               >
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-2">
                   <div>

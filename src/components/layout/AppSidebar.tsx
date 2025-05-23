@@ -1,84 +1,94 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, DollarSign, PiggyBank, History } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { 
+  LayoutDashboard, 
+  Receipt, 
+  Wallet, 
+  History,
+  BellRing
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-} from '@/components/ui/sidebar';
+import { useUser } from '@/contexts/UserContext';
+import { useFinancial } from '@/contexts/FinancialContext';
 
-const AppSidebar = () => {
-  const location = useLocation();
-
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
-
-  const sidebarItems = [
+const AppSidebar: React.FC = () => {
+  const { validations } = useFinancial();
+  
+  const navLinks = [
     {
-      title: 'Dashboard',
-      path: '/',
-      icon: LayoutDashboard,
+      to: '/dashboard',
+      label: 'Dashboard',
+      icon: <LayoutDashboard className="w-5 h-5" />
     },
     {
-      title: 'Expenses',
-      path: '/expenses',
-      icon: DollarSign,
+      to: '/expenses',
+      label: 'Expenses',
+      icon: <Receipt className="w-5 h-5" />
     },
     {
-      title: 'Savings',
-      path: '/savings',
-      icon: PiggyBank,
+      to: '/savings',
+      label: 'Savings',
+      icon: <Wallet className="w-5 h-5" />
     },
     {
-      title: 'History',
-      path: '/history',
-      icon: History,
-    },
+      to: '/history',
+      label: 'History',
+      icon: <History className="w-5 h-5" />
+    }
   ];
 
   return (
-    <div className="h-full border-r border-gray-200 w-[250px] bg-white">
-      <div className="py-6">
-        <SidebarProvider>
-          <Sidebar collapsible="none">
-            <SidebarContent>
-              <SidebarGroup>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {sidebarItems.map((item) => (
-                      <SidebarMenuItem key={item.path}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={isActive(item.path)}
-                        >
-                          <Link to={item.path} className={cn(
-                            "flex items-center gap-4 px-5 py-3 text-base font-medium rounded-lg mb-2",
-                            isActive(item.path) 
-                              ? "bg-primary/10 text-primary" 
-                              : "text-gray-600 hover:bg-gray-100 hover:text-primary"
-                          )}>
-                            <item.icon className="h-5 w-5" />
-                            <span>{item.title}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            </SidebarContent>
-          </Sidebar>
-        </SidebarProvider>
+    <motion.div 
+      initial={{ x: -20, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="hidden md:flex flex-col min-h-screen w-64 bg-white border-r border-gray-200 py-6 px-3 shadow-sm"
+    >
+      <div className="flex flex-col flex-1 space-y-6">
+        <div className="space-y-1">
+          {navLinks.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              className={({ isActive }) => cn(
+                "flex items-center px-4 py-3 text-sm font-medium rounded-md transition-all",
+                "hover:bg-blue-50 hover:text-blue-700",
+                "hover:scale-105 transform-gpu transition-transform duration-200",
+                isActive 
+                  ? "bg-blue-100 text-blue-700 shadow-sm" 
+                  : "text-gray-600"
+              )}
+            >
+              <div className="mr-3">{link.icon}</div>
+              <span>{link.label}</span>
+            </NavLink>
+          ))}
+          
+          <NavLink
+            to="/validations"
+            className={({ isActive }) => cn(
+              "flex items-center px-4 py-3 text-sm font-medium rounded-md mt-4 transition-all",
+              "hover:bg-blue-50 hover:text-blue-700 relative",
+              "hover:scale-105 transform-gpu transition-transform duration-200",
+              isActive 
+                ? "bg-blue-100 text-blue-700 shadow-sm" 
+                : "text-gray-600"
+            )}
+          >
+            <div className="mr-3"><BellRing className="w-5 h-5" /></div>
+            <span>Validations</span>
+            
+            {validations.length > 0 && (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {validations.length}
+              </div>
+            )}
+          </NavLink>
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

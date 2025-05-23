@@ -1,8 +1,14 @@
-
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from './UserContext';
 import { useToast } from '@/hooks/use-toast';
+
+// Export types to resolve TypeScript errors in other components
+export type SavingsType = 'sip' | 'mutual_fund' | 'gullak' | 'fixed_deposit' | 'other';
+export type ExpenseType = 'permanent' | 'temporary';
+export type ExpenseCategory = 'rent' | 'food' | 'subscription' | 'recharge' | 'travel' | 
+                             'bill' | 'emi' | 'entertainment' | 'shopping' | 'other';
+export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'once';
 
 export interface Expense {
   id: string;
@@ -62,12 +68,6 @@ export interface Validation {
   createdAt: string;
   expiresAt: string;
 }
-
-export type SavingsType = 'sip' | 'mutual_fund' | 'gullak' | 'fixed_deposit' | 'other';
-export type ExpenseType = 'permanent' | 'temporary';
-export type ExpenseCategory = 'rent' | 'food' | 'subscription' | 'recharge' | 'travel' | 
-                             'bill' | 'emi' | 'entertainment' | 'shopping' | 'other';
-export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'once';
 
 interface FinancialContextType {
   expenses: Expense[];
@@ -488,9 +488,6 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     if (!user) return;
     
     try {
-      // Check if this saving should be validated immediately or put in validations
-      let shouldValidateImmediately = true;
-      
       // Always create a validated savings entry
       const { data, error } = await supabase
         .from('savings')
